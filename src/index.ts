@@ -1,3 +1,126 @@
+export function initPlayerButtonElement(args: {
+  element: HTMLElement;
+  songData: string;
+  sampleBaseUri: string;
+  log?: (state: string, progress?: { current: number; total: number }) => void;
+}): void {
+  let audioContext: AudioContext | null = null;
+
+  const startPlaying = async () => {
+    const ownAudioContext = new AudioContext({ sampleRate: 44100 });
+    audioContext = ownAudioContext;
+    args.element.dataset.state = "playing";
+    args.element.onclick = stopPlaying;
+    await playSongInBrowser({ ...args, destinationNode: ownAudioContext.destination });
+    if (audioContext === ownAudioContext) stopPlaying();
+  };
+
+  const stopPlaying = () => {
+    audioContext?.close();
+    audioContext = null;
+    args.element.dataset.state = "stopped";
+    args.element.onclick = startPlaying;
+  };
+
+  stopPlaying();
+}
+
+export async function playSongInBrowser(args: {
+  songData: string;
+  destinationNode: AudioNode;
+  sampleBaseUri: string;
+  log?: (state: string, progress?: { current: number; total: number }) => void;
+}): Promise<void> {
+  const audioContext = args.destinationNode.context;
+
+  const loadSample = async (file: string) => {
+    const response = await fetch(args.sampleBaseUri + "/" + file);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    return audioBuffer;
+  };
+
+  const actions = await parseSong(args.songData, { loadSample, log: args.log });
+
+  const gainNodesByPart: Record<Part, GainNode> = {
+    bass: audioContext.createGain(),
+    drums: audioContext.createGain(),
+    guitarA: audioContext.createGain(),
+    guitarB: audioContext.createGain(),
+  };
+
+  const pannerNodesByPart: Record<Part, StereoPannerNode> = {
+    bass: audioContext.createStereoPanner(),
+    drums: audioContext.createStereoPanner(),
+    guitarA: audioContext.createStereoPanner(),
+    guitarB: audioContext.createStereoPanner(),
+  };
+
+  const currentSourceNodesByPart: Record<Part, AudioBufferSourceNode | null> = {
+    bass: null,
+    drums: null,
+    guitarA: null,
+    guitarB: null,
+  };
+
+  try {
+    for (const part in gainNodesByPart) {
+      gainNodesByPart[part as Part]
+        .connect(pannerNodesByPart[part as Part])
+        .connect(args.destinationNode);
+    }
+
+    let startTime = 0;
+    let endTime = 0;
+
+    for (const action of actions) {
+      if (action.type === "start") {
+        startTime = audioContext.currentTime;
+        continue;
+      }
+
+      if (action.type === "volume") {
+        const gain = gainNodesByPart[action.part];
+        gain.gain.setValueAtTime(action.volume, startTime + action.time);
+        continue;
+      }
+
+      if (action.type === "pan") {
+        const panner = pannerNodesByPart[action.part];
+        panner.pan.setValueAtTime(action.pan, startTime + action.time);
+      }
+
+      if (action.type === "play") {
+        currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
+        const source = audioContext.createBufferSource();
+        source.buffer = action.sample;
+        source.connect(gainNodesByPart[action.part]);
+        source.start(startTime + action.time);
+        source.onended = () => source.disconnect(gainNodesByPart[action.part]);
+        currentSourceNodesByPart[action.part] = source;
+        continue;
+      }
+
+      if (action.type === "stop") {
+        const source = currentSourceNodesByPart[action.part]!;
+        source.stop(startTime + action.time);
+        currentSourceNodesByPart[action.part] = null;
+      }
+
+      if (action.type === "end") {
+        endTime = startTime + action.time;
+        continue;
+      }
+    }
+
+    await new Promise((cb) => setTimeout(cb, (endTime - startTime) * 1000));
+  } finally {
+    for (const part in gainNodesByPart) {
+      gainNodesByPart[part as Part].disconnect(audioContext.destination);
+    }
+  }
+}
+
 export type Part = "drums" | "guitarA" | "bass" | "guitarB";
 type Instrument = "drums" | "guitar" | "bass";
 
@@ -12,22 +135,26 @@ export type Action<TSample extends Sample> =
     }
   | {
       time: number;
+      type: "volume";
+      part: Part;
+      volume: number;
+    }
+  | {
+      time: number;
+      type: "pan";
+      part: Part;
+      pan: number;
+    }
+  | {
+      time: number;
       type: "play";
       part: Part;
       sample: TSample;
-      volume: number;
-      pan: number;
     }
   | {
       time: number;
       type: "stop";
       part: Part;
-    }
-  | {
-      time: number;
-      type: "volume";
-      part: Part;
-      volume: number;
     }
   | {
       time: number;
@@ -56,6 +183,8 @@ export async function parseSong<TSample extends Sample>(
   }
 ): Promise<Iterable<Action<TSample>>> {
   callbacks.log?.("parsing data");
+
+  songData = songData.trim();
 
   let songTitle = "PunkomaticSong";
   const titleEndIndex = songData.indexOf(")");
@@ -225,6 +354,9 @@ function* emitActions<TSample extends Sample>(
     guitarB: 0,
   };
 
+  yield { time: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
+  yield { time: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };
+
   yield { time: 0, type: "start" };
 
   for (const box of boxQueue) {
@@ -264,20 +396,11 @@ function* emitActions<TSample extends Sample>(
 
         yield { part: "guitarA", time: box.time, type: "volume", volume: volume };
         yield { part: "guitarB", time: box.time, type: "volume", volume: volume };
+      } else {
+        yield { part: box.part, time: box.time, type: "volume", volume };
       }
 
-      let pan = 0.0;
-      if (box.part === "guitarA") pan -= GUITAR_PANNING;
-      if (box.part === "guitarB") pan += GUITAR_PANNING;
-
-      yield {
-        part: box.part,
-        time: box.time,
-        type: "play",
-        sample: sample,
-        volume: volume,
-        pan: pan,
-      };
+      yield { part: box.part, time: box.time, type: "play", sample };
     }
   }
 
@@ -296,7 +419,7 @@ function parseBase52(data: string): number {
     const digit = data.charCodeAt(i);
     if (lowerA <= digit && digit <= lowerZ) result += digit - lowerA;
     else if (upperA <= digit && digit <= upperZ) result += digit - upperA + 26;
-    else throw RangeError();
+    else throw RangeError(data);
   }
 
   return result;
@@ -1698,3 +1821,15 @@ const LAST_LEAD_INDEX = sampleFilesByInstrument.guitar.indexOf(
 const EXTRA_LEAD_INDEX = sampleFilesByInstrument.guitar.indexOf(
   "data/Guitars/GuitLeadSpecialClassicE0727.mp3"
 );
+
+declare global {
+  interface Window {
+    playSongInBrowser: typeof playSongInBrowser;
+    initPlayerButtonElement: typeof initPlayerButtonElement;
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.playSongInBrowser = playSongInBrowser;
+  window.initPlayerButtonElement = initPlayerButtonElement;
+}

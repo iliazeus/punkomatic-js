@@ -1,8 +1,6 @@
-import Speaker from "speaker";
 import { AudioContext, AudioBufferSourceNode, GainNode } from "node-web-audio-api";
 import { readFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
-import { setTimeout } from "node:timers";
 import { join as joinPath } from "node:path";
 import { parseSong } from "./index";
 
@@ -74,7 +72,6 @@ async function main() {
       source.onended = () => source.disconnect(gainNodesByPart[action.part]);
       currentSourcesByPart[action.part]?.stop();
       currentSourcesByPart[action.part] = source;
-      gainNodesByPart[action.part].value = action.volume;
       continue;
     }
 
