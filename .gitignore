@@ -1,3 +1,6 @@
+/data
+*.pom
+
 # Logs
 logs
 *.log
