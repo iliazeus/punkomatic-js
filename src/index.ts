@@ -1,7 +1,7 @@
 export function initPlayerButtonElement(args: {
   element: HTMLElement;
   songData: string;
-  sampleBaseUri: string;
+  sampleBaseUrl: string;
   log?: (state: string, progress?: { current: number; total: number }) => void;
 }): void {
   let audioContext: AudioContext | null = null;
@@ -25,16 +25,134 @@ export function initPlayerButtonElement(args: {
   stopPlaying();
 }
 
+export async function renderSongInBrowser(args: {
+  songData: string;
+  sampleBaseUrl: string;
+  log?: (state: string, progress?: { current: number; total: number }) => void;
+}): Promise<Blob> {
+  const dummyAudioContext = new OfflineAudioContext({
+    length: 1 * 44100,
+    sampleRate: 44100,
+    numberOfChannels: 2,
+  });
+
+  const sampleCache = new Map<string, ArrayBuffer>();
+
+  const loadSample = async (file: string) => {
+    const response = await fetch(args.sampleBaseUrl + "/" + file);
+    const arrayBuffer = await response.arrayBuffer();
+    sampleCache.set(file, arrayBuffer);
+    const audioBuffer = await dummyAudioContext.decodeAudioData(arrayBuffer.slice(0));
+    return audioBuffer;
+  };
+
+  let totalDuration = 0;
+  for (const action of await parseSong(args.songData, { loadSample, log: args.log })) {
+    if (action.type === "start") {
+      totalDuration = action.totalDuration;
+      break;
+    }
+  }
+
+  const audioContext = new OfflineAudioContext({
+    length: totalDuration * 44100,
+    sampleRate: 44100,
+    numberOfChannels: 2,
+  });
+
+  const loadCachedSample = async (file: string) => {
+    const arrayBuffer = sampleCache.get(file)!;
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    return audioBuffer;
+  };
+
+  const actions = await parseSong(args.songData, { loadSample: loadCachedSample, log: args.log });
+
+  const gainNodesByPart: Record<Part, GainNode> = {
+    bass: audioContext.createGain(),
+    drums: audioContext.createGain(),
+    guitarA: audioContext.createGain(),
+    guitarB: audioContext.createGain(),
+  };
+
+  const pannerNodesByPart: Record<Part, StereoPannerNode> = {
+    bass: audioContext.createStereoPanner(),
+    drums: audioContext.createStereoPanner(),
+    guitarA: audioContext.createStereoPanner(),
+    guitarB: audioContext.createStereoPanner(),
+  };
+
+  const currentSourceNodesByPart: Record<Part, AudioBufferSourceNode | null> = {
+    bass: null,
+    drums: null,
+    guitarA: null,
+    guitarB: null,
+  };
+
+  for (const part in gainNodesByPart) {
+    gainNodesByPart[part as Part]
+      .connect(pannerNodesByPart[part as Part])
+      .connect(audioContext.destination);
+  }
+
+  let startTime = 0;
+  let endTime = 0;
+
+  for (const action of actions) {
+    if (action.type === "start") {
+      startTime = audioContext.currentTime;
+      continue;
+    }
+
+    if (action.type === "volume") {
+      const gain = gainNodesByPart[action.part];
+      gain.gain.setValueAtTime(action.volume, startTime + action.time);
+      continue;
+    }
+
+    if (action.type === "pan") {
+      const panner = pannerNodesByPart[action.part];
+      panner.pan.setValueAtTime(action.pan, startTime + action.time);
+    }
+
+    if (action.type === "play") {
+      currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
+      const source = audioContext.createBufferSource();
+      source.buffer = action.sample;
+      source.connect(gainNodesByPart[action.part]);
+      source.start(startTime + action.time);
+      source.onended = () => source.disconnect(gainNodesByPart[action.part]);
+      currentSourceNodesByPart[action.part] = source;
+      continue;
+    }
+
+    if (action.type === "stop") {
+      const source = currentSourceNodesByPart[action.part]!;
+      source.stop(startTime + action.time);
+      currentSourceNodesByPart[action.part] = null;
+    }
+
+    if (action.type === "end") {
+      endTime = startTime + action.time;
+      continue;
+    }
+  }
+
+  const finalAudioBuffer = await audioContext.startRendering();
+  return audioBufferToWavBlob(finalAudioBuffer);
+}
+
 export async function playSongInBrowser(args: {
   songData: string;
   destinationNode: AudioNode;
-  sampleBaseUri: string;
+  sampleBaseUrl: string;
   log?: (state: string, progress?: { current: number; total: number }) => void;
+  noWait?: boolean;
 }): Promise<void> {
   const audioContext = args.destinationNode.context;
 
   const loadSample = async (file: string) => {
-    const response = await fetch(args.sampleBaseUri + "/" + file);
+    const response = await fetch(args.sampleBaseUrl + "/" + file);
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     return audioBuffer;
@@ -132,6 +250,7 @@ export type Action<TSample extends Sample> =
   | {
       time: number;
       type: "start";
+      totalDuration: number;
     }
   | {
       time: number;
@@ -330,7 +449,7 @@ function* timeBoxes(boxes: Iterable<Box>): Iterable<Box & { time: number }> {
 }
 
 function* emitActions<TSample extends Sample>(
-  boxQueue: Iterable<Box & { instrument: Instrument; part: Part; time: number }>,
+  boxQueue: Array<Box & { instrument: Instrument; part: Part; time: number }>,
   samplesByInstrument: Record<Instrument, Map<number, TSample>>
 ): Iterable<Action<TSample>> {
   const currentSampleIndices: Record<Part, number | null> = {
@@ -354,10 +473,25 @@ function* emitActions<TSample extends Sample>(
     guitarB: 0,
   };
 
+  let totalDuration = 0;
+
+  for (const box of boxQueue) {
+    if (box.type === "stop") {
+      totalDuration = Math.max(totalDuration, box.time);
+      continue;
+    }
+
+    if (box.type === "sample") {
+      const sample = samplesByInstrument[box.instrument].get(box.index)!;
+      totalDuration = Math.max(totalDuration, box.time + sample.duration);
+      continue;
+    }
+  }
+
+  yield { time: 0, type: "start", totalDuration };
+
   yield { time: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
   yield { time: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };
-
-  yield { time: 0, type: "start" };
 
   for (const box of boxQueue) {
     if (box.type === "empty") continue;
@@ -423,6 +557,65 @@ function parseBase52(data: string): number {
   }
 
   return result;
+}
+
+// adapted from https://stackoverflow.com/a/30045041
+function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
+  const wavByteLength = 44 + 2 * audioBuffer.numberOfChannels * audioBuffer.length;
+  const wavArrayBuffer = new ArrayBuffer(wavByteLength);
+  const wavDataView = new DataView(wavArrayBuffer);
+
+  let offset = 0;
+
+  function writeUint16LE(data: number) {
+    wavDataView.setUint16(offset, data, true);
+    offset += 2;
+  }
+
+  function writeUint32LE(data: number) {
+    wavDataView.setUint32(offset, data, true);
+    offset += 4;
+  }
+
+  function writeInt16LE(data: number) {
+    wavDataView.setInt16(offset, data, true);
+    offset += 2;
+  }
+
+  const channels: Float32Array[] = [];
+
+  // write WAVE header
+  writeUint32LE(0x46464952); // "RIFF"
+  writeUint32LE(wavByteLength - 8); // file length - 8
+  writeUint32LE(0x45564157); // "WAVE"
+
+  writeUint32LE(0x20746d66); // "fmt " chunk
+  writeUint32LE(16); // length = 16
+  writeUint16LE(1); // PCM (uncompressed)
+  writeUint16LE(audioBuffer.numberOfChannels);
+  writeUint32LE(audioBuffer.sampleRate);
+  writeUint32LE(audioBuffer.sampleRate * 2 * audioBuffer.numberOfChannels); // avg. bytes/sec
+  writeUint16LE(audioBuffer.numberOfChannels * 2); // block-align
+  writeUint16LE(16); // 16-bit (hardcoded in this demo)
+
+  writeUint32LE(0x61746164); // "data" - chunk
+  writeUint32LE(wavByteLength - offset - 4); // chunk length
+
+  // write interleaved data
+  for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+    channels.push(audioBuffer.getChannelData(i));
+  }
+
+  for (let sampleIndex = 0; sampleIndex < audioBuffer.length; sampleIndex++) {
+    for (let channelIndex = 0; channelIndex < audioBuffer.numberOfChannels; channelIndex++) {
+      // interleave channels
+      let sample = Math.max(-1, Math.min(1, channels[channelIndex][sampleIndex])); // clamp
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int
+      writeInt16LE(sample);
+    }
+  }
+
+  return new Blob([wavArrayBuffer], { type: "audio/wav" });
 }
 
 const sampleFilesByInstrument: Readonly<Record<"guitar" | "drums" | "bass", readonly string[]>> = {
@@ -1825,11 +2018,13 @@ const EXTRA_LEAD_INDEX = sampleFilesByInstrument.guitar.indexOf(
 declare global {
   interface Window {
     playSongInBrowser: typeof playSongInBrowser;
+    renderSongInBrowser: typeof renderSongInBrowser;
     initPlayerButtonElement: typeof initPlayerButtonElement;
   }
 }
 
 if (typeof window !== "undefined") {
   window.playSongInBrowser = playSongInBrowser;
+  window.renderSongInBrowser = renderSongInBrowser;
   window.initPlayerButtonElement = initPlayerButtonElement;
 }
