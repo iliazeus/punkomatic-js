@@ -4,6 +4,8 @@ A [Punk-O-Matic 2] song data parser and player.
 
 [Punk-O-Matic 2]: https://www.evildoggames.com/punk-o-matic-2.html
 
+[Try it out online!](https://iliazeus.github.io/punkomatic-js/)
+
 ### How to use
 
 You'll need the `data` folder from `POM Converter`. You can download it from the [developer website].
