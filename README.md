@@ -8,7 +8,13 @@ A [Punk-O-Matic 2] song data parser and player.
 
 You'll need the `data` folder from `POM Converter`. You can download it from the [developer website].
 
+I also host a copy [in the repo]. _These are not mine_, but they are publicly available.
+
+All other code and assets are published under the [MIT license].
+
 [developer website]: https://www.evildoggames.com/punk-o-matic-2.html
+[in the repo]: https://github.com/iliazeus/punkomatic-js/tree/master/data
+[MIT license]: https://github.com/iliazeus/punkomatic-js/tree/master/LICENSE
 
 The simplest way is to include the `punkomatic.bundle.js` in the `<head>`:
 

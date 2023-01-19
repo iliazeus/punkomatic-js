@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="/punkomatic.bundle.js"></script>
+  </head>
+  <body>
+    <div>
+      <textarea id="song-data-textarea" placeholder="Put your song data here"></textarea>
+    </div>
+    <div>
+      <button id="convert-button">Convert</button>
+    </div>
+    <div>
+      <audio id="audio" controls></audio>
+    </div>
+    <div id="logs-div"></div>
+    <script>
+      window.onload = () => {
+        const songDataTextarea = document.getElementById("song-data-textarea");
+        const convertButton = document.getElementById("convert-button");
+        const audioElement = document.getElementById("audio");
+        const logsDiv = document.getElementById("logs-div");
+
+        convertButton.onclick = async () => {
+          try {
+            convertButton.disabled = true;
+            logsDiv.innerHTML = "";
+            const blob = await renderSongInBrowser({
+              songData: songDataTextarea.value,
+              sampleBaseUrl: "/",
+              log: (text, progress) =>
+                (logsDiv.innerText = progress
+                  ? `${text} (${progress.current}/${progress.total})`
+                  : text),
+            });
+            const url = URL.createObjectURL(blob);
+            audioElement.src = url;
+            logsDiv.innerHTML = `<a download href="${url}" filename="song.wav">Download WAV</a>`;
+          } catch (error) {
+            logsDiv.innerText = String(error);
+          } finally {
+            convertButton.disabled = false;
+          }
+        };
+      };
+    </script>
+  </body>
+</html>
