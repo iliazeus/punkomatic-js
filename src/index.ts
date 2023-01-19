@@ -46,16 +46,16 @@ export async function renderSongInBrowser(args: {
     return audioBuffer;
   };
 
-  let totalDuration = 0;
+  let totalSampleCount = 0;
   for (const action of await parseSong(args.songData, { loadSample, log: args.log })) {
     if (action.type === "start") {
-      totalDuration = action.totalDuration;
+      totalSampleCount = action.totalSampleCount;
       break;
     }
   }
 
   const audioContext = new OfflineAudioContext({
-    length: totalDuration * 44100,
+    length: totalSampleCount,
     sampleRate: 44100,
     numberOfChannels: 2,
   });
@@ -67,6 +67,20 @@ export async function renderSongInBrowser(args: {
   };
 
   const actions = await parseSong(args.songData, { loadSample: loadCachedSample, log: args.log });
+
+  const audioBuffersByPart: Record<Part, AudioBuffer> = {
+    bass: audioContext.createBuffer(2, totalSampleCount, 44100),
+    drums: audioContext.createBuffer(2, totalSampleCount, 44100),
+    guitarA: audioContext.createBuffer(2, totalSampleCount, 44100),
+    guitarB: audioContext.createBuffer(2, totalSampleCount, 44100),
+  };
+
+  const sourceNodesByPart: Record<Part, AudioBufferSourceNode> = {
+    bass: audioContext.createBufferSource(),
+    drums: audioContext.createBufferSource(),
+    guitarA: audioContext.createBufferSource(),
+    guitarB: audioContext.createBufferSource(),
+  };
 
   const gainNodesByPart: Record<Part, GainNode> = {
     bass: audioContext.createGain(),
@@ -82,59 +96,87 @@ export async function renderSongInBrowser(args: {
     guitarB: audioContext.createStereoPanner(),
   };
 
-  const currentSourceNodesByPart: Record<Part, AudioBufferSourceNode | null> = {
+  for (const key in audioBuffersByPart) {
+    const part = key as Part;
+    sourceNodesByPart[part]
+      .connect(gainNodesByPart[part])
+      .connect(pannerNodesByPart[part])
+      .connect(audioContext.destination);
+  }
+
+  const startSampleIndicesByPart: Record<Part, number> = {
+    bass: 0,
+    drums: 0,
+    guitarA: 0,
+    guitarB: 0,
+  };
+
+  const currentSamplesByPart: Record<Part, AudioBuffer | null> = {
     bass: null,
     drums: null,
     guitarA: null,
     guitarB: null,
   };
 
-  for (const part in gainNodesByPart) {
-    gainNodesByPart[part as Part]
-      .connect(pannerNodesByPart[part as Part])
-      .connect(audioContext.destination);
-  }
-
-  let startTime = 0;
-  let endTime = 0;
+  let currentSampleIndex = 0;
 
   for (const action of actions) {
+    if (currentSampleIndex < action.sampleIndex) {
+      const tempBuffer = new Float32Array(action.sampleIndex - currentSampleIndex);
+
+      for (const part in currentSamplesByPart) {
+        const sample = currentSamplesByPart[part as Part];
+        if (!sample) continue;
+
+        const offsetIntoSample =
+          OFFSET_INTO_SAMPLE + currentSampleIndex - startSampleIndicesByPart[part as Part];
+
+        const partBuffer = audioBuffersByPart[part as Part];
+
+        for (let c = 0; c < sample.numberOfChannels; c++) {
+          tempBuffer.fill(0);
+          sample.copyFromChannel(tempBuffer, c, offsetIntoSample);
+          partBuffer.copyToChannel(tempBuffer, c, currentSampleIndex);
+        }
+      }
+
+      currentSampleIndex = action.sampleIndex;
+    }
+
     if (action.type === "start") {
-      startTime = audioContext.currentTime;
       continue;
     }
 
     if (action.type === "volume") {
       const gain = gainNodesByPart[action.part];
-      gain.gain.setValueAtTime(action.volume, startTime + action.time);
+      gain.gain.setValueAtTime(action.volume, action.time);
       continue;
     }
 
     if (action.type === "pan") {
       const panner = pannerNodesByPart[action.part];
-      panner.pan.setValueAtTime(action.pan, startTime + action.time);
+      panner.pan.setValueAtTime(action.pan, action.time);
+      continue;
     }
 
     if (action.type === "play") {
-      currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
-      const source = audioContext.createBufferSource();
-      source.buffer = action.sample;
-      source.connect(gainNodesByPart[action.part]);
-      source.start(startTime + action.time);
-      source.onended = () => source.disconnect(gainNodesByPart[action.part]);
-      currentSourceNodesByPart[action.part] = source;
+      currentSamplesByPart[action.part] = action.sample;
+      startSampleIndicesByPart[action.part] = action.sampleIndex;
       continue;
     }
 
     if (action.type === "stop") {
-      const source = currentSourceNodesByPart[action.part]!;
-      source.stop(startTime + action.time);
-      currentSourceNodesByPart[action.part] = null;
+      currentSamplesByPart[action.part] = null;
+      startSampleIndicesByPart[action.part] = action.sampleIndex;
+      continue;
     }
 
     if (action.type === "end") {
-      endTime = startTime + action.time;
-      continue;
+      for (const part in audioBuffersByPart) {
+        console.log(audioBuffersByPart[part as Part]);
+        sourceNodesByPart[part as Part].buffer = audioBuffersByPart[part as Part];
+        sourceNodesByPart[part as Part].start(0);
+      }
     }
   }
 
@@ -154,7 +196,22 @@ export async function playSongInBrowser(args: {
   const loadSample = async (file: string) => {
     const response = await fetch(args.sampleBaseUrl + "/" + file);
     const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // TODO: reimplement
+    const audioBuffer = audioContext.createBuffer(
+      2,
+      rawAudioBuffer.length - OFFSET_INTO_SAMPLE,
+      44100
+    );
+
+    const temp = new Float32Array(audioBuffer.length);
+
+    for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+      rawAudioBuffer.copyFromChannel(temp, c, OFFSET_INTO_SAMPLE);
+      audioBuffer.copyToChannel(temp, c, 0);
+    }
+
     return audioBuffer;
   };
 
@@ -212,6 +269,7 @@ export async function playSongInBrowser(args: {
         currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
         const source = audioContext.createBufferSource();
         source.buffer = action.sample;
+        // source.
         source.connect(gainNodesByPart[action.part]);
         source.start(startTime + action.time);
         source.onended = () => source.disconnect(gainNodesByPart[action.part]);
@@ -244,43 +302,53 @@ type Instrument = "drums" | "guitar" | "bass";
 
 export interface Sample {
   duration: number;
+  length: number;
 }
 
 export type Action<TSample extends Sample> =
   | {
       time: number;
+      sampleIndex: number;
       type: "start";
       totalDuration: number;
+      totalSampleCount: number;
     }
   | {
       time: number;
+      sampleIndex: number;
       type: "volume";
       part: Part;
       volume: number;
     }
   | {
       time: number;
+      sampleIndex: number;
       type: "pan";
       part: Part;
       pan: number;
     }
   | {
       time: number;
+      sampleIndex: number;
       type: "play";
       part: Part;
       sample: TSample;
     }
   | {
       time: number;
+      sampleIndex: number;
       type: "stop";
       part: Part;
     }
   | {
       time: number;
+      sampleIndex: number;
       type: "end";
     };
 
 const BOX_DURATION = 62259 / (2 * 44100);
+const BOX_SAMPLE_COUNT = 62258 / 2;
+const OFFSET_INTO_SAMPLE = 1300;
 
 const MASTER_VOLUME = 0.8;
 
@@ -339,7 +407,9 @@ export async function parseSong<TSample extends Sample>(
 
   callbacks.log?.("done loading samples");
 
-  const boxQueue: Array<Box & { instrument: Instrument; part: Part; time: number }> = [
+  const boxQueue: Array<
+    Box & { instrument: Instrument; part: Part; time: number; sampleIndex: number }
+  > = [
     ...[...timeBoxes(drumBoxes)].map((box) => ({
       ...box,
       instrument: "drums" as Instrument,
@@ -426,10 +496,10 @@ async function loadSamples<TSample extends Sample>(
   return samples;
 }
 
-function* timeBoxes(boxes: Iterable<Box>): Iterable<Box & { time: number }> {
+function* timeBoxes(boxes: Iterable<Box>): Iterable<Box & { time: number; sampleIndex: number }> {
   let index = 0;
   for (const box of boxes) {
-    yield { ...box, time: index * BOX_DURATION };
+    yield { ...box, time: index * BOX_DURATION, sampleIndex: index * BOX_SAMPLE_COUNT };
 
     if (box.type === "empty") {
       index += box.length;
@@ -449,7 +519,7 @@ function* timeBoxes(boxes: Iterable<Box>): Iterable<Box & { time: number }> {
 }
 
 function* emitActions<TSample extends Sample>(
-  boxQueue: Array<Box & { instrument: Instrument; part: Part; time: number }>,
+  boxQueue: Array<Box & { instrument: Instrument; part: Part; time: number; sampleIndex: number }>,
   samplesByInstrument: Record<Instrument, Map<number, TSample>>
 ): Iterable<Action<TSample>> {
   const currentSampleIndices: Record<Part, number | null> = {
@@ -474,24 +544,27 @@ function* emitActions<TSample extends Sample>(
   };
 
   let totalDuration = 0;
+  let totalSampleCount = 0;
 
   for (const box of boxQueue) {
     if (box.type === "stop") {
       totalDuration = Math.max(totalDuration, box.time);
+      totalSampleCount = Math.max(totalSampleCount, box.sampleIndex);
       continue;
     }
 
     if (box.type === "sample") {
       const sample = samplesByInstrument[box.instrument].get(box.index)!;
       totalDuration = Math.max(totalDuration, box.time + sample.duration);
+      totalSampleCount = Math.max(totalSampleCount, box.sampleIndex + sample.length);
       continue;
     }
   }
 
-  yield { time: 0, type: "start", totalDuration };
+  yield { time: 0, sampleIndex: 0, type: "start", totalDuration, totalSampleCount };
 
-  yield { time: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
-  yield { time: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };
+  yield { time: 0, sampleIndex: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
+  yield { time: 0, sampleIndex: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };
 
   for (const box of boxQueue) {
     if (box.type === "empty") continue;
@@ -501,7 +574,7 @@ function* emitActions<TSample extends Sample>(
       currentSampleStartTimes[box.part] = null;
       currentPartEndTimes[box.part] = box.time;
 
-      yield { part: box.part, time: box.time, type: "stop" };
+      yield { part: box.part, time: box.time, sampleIndex: box.sampleIndex, type: "stop" };
       continue;
     }
 
@@ -528,17 +601,39 @@ function* emitActions<TSample extends Sample>(
       ) {
         volume *= GUITAR_MIXING_LEVEL;
 
-        yield { part: "guitarA", time: box.time, type: "volume", volume: volume };
-        yield { part: "guitarB", time: box.time, type: "volume", volume: volume };
+        yield {
+          part: "guitarA",
+          time: box.time,
+          sampleIndex: box.sampleIndex,
+          type: "volume",
+          volume: volume,
+        };
+        yield {
+          part: "guitarB",
+          time: box.time,
+          sampleIndex: box.sampleIndex,
+          type: "volume",
+          volume: volume,
+        };
       } else {
-        yield { part: box.part, time: box.time, type: "volume", volume };
+        yield {
+          part: box.part,
+          time: box.time,
+          sampleIndex: box.sampleIndex,
+          type: "volume",
+          volume,
+        };
       }
 
-      yield { part: box.part, time: box.time, type: "play", sample };
+      yield { part: box.part, time: box.time, sampleIndex: box.sampleIndex, type: "play", sample };
     }
   }
 
-  yield { time: Math.max(...Object.values(currentPartEndTimes)), type: "end" };
+  yield {
+    time: totalDuration,
+    sampleIndex: totalSampleCount,
+    type: "end",
+  };
 }
 
 function parseBase52(data: string): number {

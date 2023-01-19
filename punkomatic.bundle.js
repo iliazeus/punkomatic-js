@@ -36,15 +36,15 @@ async function renderSongInBrowser(args) {
         const audioBuffer = await dummyAudioContext.decodeAudioData(arrayBuffer.slice(0));
         return audioBuffer;
     };
-    let totalDuration = 0;
+    let totalSampleCount = 0;
     for (const action of await parseSong(args.songData, { loadSample, log: args.log })) {
         if (action.type === "start") {
-            totalDuration = action.totalDuration;
+            totalSampleCount = action.totalSampleCount;
             break;
         }
     }
     const audioContext = new OfflineAudioContext({
-        length: totalDuration * 44100,
+        length: totalSampleCount,
         sampleRate: 44100,
         numberOfChannels: 2,
     });
@@ -54,6 +54,18 @@ async function renderSongInBrowser(args) {
         return audioBuffer;
     };
     const actions = await parseSong(args.songData, { loadSample: loadCachedSample, log: args.log });
+    const audioBuffersByPart = {
+        bass: audioContext.createBuffer(2, totalSampleCount, 44100),
+        drums: audioContext.createBuffer(2, totalSampleCount, 44100),
+        guitarA: audioContext.createBuffer(2, totalSampleCount, 44100),
+        guitarB: audioContext.createBuffer(2, totalSampleCount, 44100),
+    };
+    const sourceNodesByPart = {
+        bass: audioContext.createBufferSource(),
+        drums: audioContext.createBufferSource(),
+        guitarA: audioContext.createBufferSource(),
+        guitarB: audioContext.createBufferSource(),
+    };
     const gainNodesByPart = {
         bass: audioContext.createGain(),
         drums: audioContext.createGain(),
@@ -66,51 +78,72 @@ async function renderSongInBrowser(args) {
         guitarA: audioContext.createStereoPanner(),
         guitarB: audioContext.createStereoPanner(),
     };
-    const currentSourceNodesByPart = {
+    for (const key in audioBuffersByPart) {
+        const part = key;
+        sourceNodesByPart[part]
+            .connect(gainNodesByPart[part])
+            .connect(pannerNodesByPart[part])
+            .connect(audioContext.destination);
+    }
+    const startSampleIndicesByPart = {
+        bass: 0,
+        drums: 0,
+        guitarA: 0,
+        guitarB: 0,
+    };
+    const currentSamplesByPart = {
         bass: null,
         drums: null,
         guitarA: null,
         guitarB: null,
     };
-    for (const part in gainNodesByPart) {
-        gainNodesByPart[part]
-            .connect(pannerNodesByPart[part])
-            .connect(audioContext.destination);
-    }
-    let startTime = 0;
-    let endTime = 0;
+    let currentSampleIndex = 0;
     for (const action of actions) {
+        if (currentSampleIndex < action.sampleIndex) {
+            const tempBuffer = new Float32Array(action.sampleIndex - currentSampleIndex);
+            for (const part in currentSamplesByPart) {
+                const sample = currentSamplesByPart[part];
+                if (!sample)
+                    continue;
+                const offsetIntoSample = OFFSET_INTO_SAMPLE + currentSampleIndex - startSampleIndicesByPart[part];
+                const partBuffer = audioBuffersByPart[part];
+                for (let c = 0; c < sample.numberOfChannels; c++) {
+                    tempBuffer.fill(0);
+                    sample.copyFromChannel(tempBuffer, c, offsetIntoSample);
+                    partBuffer.copyToChannel(tempBuffer, c, currentSampleIndex);
+                }
+            }
+            currentSampleIndex = action.sampleIndex;
+        }
         if (action.type === "start") {
-            startTime = audioContext.currentTime;
             continue;
         }
         if (action.type === "volume") {
             const gain = gainNodesByPart[action.part];
-            gain.gain.setValueAtTime(action.volume, startTime + action.time);
+            gain.gain.setValueAtTime(action.volume, action.time);
             continue;
         }
         if (action.type === "pan") {
             const panner = pannerNodesByPart[action.part];
-            panner.pan.setValueAtTime(action.pan, startTime + action.time);
+            panner.pan.setValueAtTime(action.pan, action.time);
+            continue;
         }
         if (action.type === "play") {
-            currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
-            const source = audioContext.createBufferSource();
-            source.buffer = action.sample;
-            source.connect(gainNodesByPart[action.part]);
-            source.start(startTime + action.time);
-            source.onended = () => source.disconnect(gainNodesByPart[action.part]);
-            currentSourceNodesByPart[action.part] = source;
+            currentSamplesByPart[action.part] = action.sample;
+            startSampleIndicesByPart[action.part] = action.sampleIndex;
             continue;
         }
         if (action.type === "stop") {
-            const source = currentSourceNodesByPart[action.part];
-            source.stop(startTime + action.time);
-            currentSourceNodesByPart[action.part] = null;
+            currentSamplesByPart[action.part] = null;
+            startSampleIndicesByPart[action.part] = action.sampleIndex;
+            continue;
         }
         if (action.type === "end") {
-            endTime = startTime + action.time;
-            continue;
+            for (const part in audioBuffersByPart) {
+                console.log(audioBuffersByPart[part]);
+                sourceNodesByPart[part].buffer = audioBuffersByPart[part];
+                sourceNodesByPart[part].start(0);
+            }
         }
     }
     const finalAudioBuffer = await audioContext.startRendering();
@@ -122,7 +155,14 @@ async function playSongInBrowser(args) {
     const loadSample = async (file) => {
         const response = await fetch(args.sampleBaseUrl + "/" + file);
         const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        // TODO: reimplement
+        const audioBuffer = audioContext.createBuffer(2, rawAudioBuffer.length - OFFSET_INTO_SAMPLE, 44100);
+        const temp = new Float32Array(audioBuffer.length);
+        for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+            rawAudioBuffer.copyFromChannel(temp, c, OFFSET_INTO_SAMPLE);
+            audioBuffer.copyToChannel(temp, c, 0);
+        }
         return audioBuffer;
     };
     const actions = await parseSong(args.songData, { loadSample, log: args.log });
@@ -170,6 +210,7 @@ async function playSongInBrowser(args) {
                 currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
                 const source = audioContext.createBufferSource();
                 source.buffer = action.sample;
+                // source.
                 source.connect(gainNodesByPart[action.part]);
                 source.start(startTime + action.time);
                 source.onended = () => source.disconnect(gainNodesByPart[action.part]);
@@ -196,6 +237,8 @@ async function playSongInBrowser(args) {
 }
 exports.playSongInBrowser = playSongInBrowser;
 const BOX_DURATION = 62259 / (2 * 44100);
+const BOX_SAMPLE_COUNT = 62258 / 2;
+const OFFSET_INTO_SAMPLE = 1300;
 const MASTER_VOLUME = 0.8;
 const BASE_VOLUME_BY_INSTRUMENT = {
     drums: 1.9,
@@ -297,7 +340,7 @@ async function loadSamples(instrument, boxes, callbacks) {
 function* timeBoxes(boxes) {
     let index = 0;
     for (const box of boxes) {
-        yield { ...box, time: index * BOX_DURATION };
+        yield { ...box, time: index * BOX_DURATION, sampleIndex: index * BOX_SAMPLE_COUNT };
         if (box.type === "empty") {
             index += box.length;
             continue;
@@ -332,20 +375,23 @@ function* emitActions(boxQueue, samplesByInstrument) {
         guitarB: 0,
     };
     let totalDuration = 0;
+    let totalSampleCount = 0;
     for (const box of boxQueue) {
         if (box.type === "stop") {
             totalDuration = Math.max(totalDuration, box.time);
+            totalSampleCount = Math.max(totalSampleCount, box.sampleIndex);
             continue;
         }
         if (box.type === "sample") {
             const sample = samplesByInstrument[box.instrument].get(box.index);
             totalDuration = Math.max(totalDuration, box.time + sample.duration);
+            totalSampleCount = Math.max(totalSampleCount, box.sampleIndex + sample.length);
             continue;
         }
     }
-    yield { time: 0, type: "start", totalDuration };
-    yield { time: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
-    yield { time: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };
+    yield { time: 0, sampleIndex: 0, type: "start", totalDuration, totalSampleCount };
+    yield { time: 0, sampleIndex: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
+    yield { time: 0, sampleIndex: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };
     for (const box of boxQueue) {
         if (box.type === "empty")
             continue;
@@ -353,7 +399,7 @@ function* emitActions(boxQueue, samplesByInstrument) {
             currentSampleIndices[box.part] = null;
             currentSampleStartTimes[box.part] = null;
             currentPartEndTimes[box.part] = box.time;
-            yield { part: box.part, time: box.time, type: "stop" };
+            yield { part: box.part, time: box.time, sampleIndex: box.sampleIndex, type: "stop" };
             continue;
         }
         if (box.type === "sample") {
@@ -370,16 +416,38 @@ function* emitActions(boxQueue, samplesByInstrument) {
                 currentSampleIndices["guitarA"] === currentSampleIndices["guitarB"] &&
                 currentSampleStartTimes["guitarA"] == currentSampleStartTimes["guitarB"]) {
                 volume *= GUITAR_MIXING_LEVEL;
-                yield { part: "guitarA", time: box.time, type: "volume", volume: volume };
-                yield { part: "guitarB", time: box.time, type: "volume", volume: volume };
+                yield {
+                    part: "guitarA",
+                    time: box.time,
+                    sampleIndex: box.sampleIndex,
+                    type: "volume",
+                    volume: volume,
+                };
+                yield {
+                    part: "guitarB",
+                    time: box.time,
+                    sampleIndex: box.sampleIndex,
+                    type: "volume",
+                    volume: volume,
+                };
             }
             else {
-                yield { part: box.part, time: box.time, type: "volume", volume };
+                yield {
+                    part: box.part,
+                    time: box.time,
+                    sampleIndex: box.sampleIndex,
+                    type: "volume",
+                    volume,
+                };
             }
-            yield { part: box.part, time: box.time, type: "play", sample };
+            yield { part: box.part, time: box.time, sampleIndex: box.sampleIndex, type: "play", sample };
         }
     }
-    yield { time: Math.max(...Object.values(currentPartEndTimes)), type: "end" };
+    yield {
+        time: totalDuration,
+        sampleIndex: totalSampleCount,
+        type: "end",
+    };
 }
 function parseBase52(data) {
     const lowerA = "a".charCodeAt(0);
