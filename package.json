@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node -r source-map-support/register ./dist/node.js",
-    "bundle": "tsc && browserify dist/index.js -o dist/bundle.js"
+    "bundle": "tsc && browserify dist/index.js -o punkomatic.bundle.js"
   },
   "repository": {
     "type": "git",
