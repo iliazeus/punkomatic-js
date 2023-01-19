@@ -54,6 +54,7 @@ async function renderSongInBrowser(args) {
         return audioBuffer;
     };
     const actions = await parseSong(args.songData, { loadSample: loadCachedSample, log: args.log });
+    args.log?.("rendering song");
     const audioBuffersByPart = {
         bass: audioContext.createBuffer(2, totalSampleCount, 44100),
         drums: audioContext.createBuffer(2, totalSampleCount, 44100),
@@ -147,7 +148,9 @@ async function renderSongInBrowser(args) {
         }
     }
     const finalAudioBuffer = await audioContext.startRendering();
-    return audioBufferToWavBlob(finalAudioBuffer);
+    const blob = audioBufferToWavBlob(finalAudioBuffer);
+    args.log?.("done rendering song");
+    return blob;
 }
 exports.renderSongInBrowser = renderSongInBrowser;
 async function playSongInBrowser(args) {
@@ -250,23 +253,16 @@ const GUITAR_MIXING_LEVEL = 0.85;
 const GUITAR_PANNING = 0.75;
 async function parseSong(songData, callbacks) {
     callbacks.log?.("parsing data");
-    songData = songData.trim();
-    let songTitle = "PunkomaticSong";
-    const titleEndIndex = songData.indexOf(")");
-    if (titleEndIndex === -1) {
+    const match = songData.trim().match(/^\((.*)\)(.*)$/s);
+    if (!match) {
         throw new RangeError("Invalid Data: Song title was not found.");
     }
-    songTitle = songData.substr(1, titleEndIndex - 1).trim();
-    const actualData = songData.substr(titleEndIndex + 1, songData.length - titleEndIndex - 1);
-    const songParts = actualData.split(",");
-    const drumData = songParts[0];
-    const guitarAData = songParts[1];
-    const bassData = songParts[2];
-    const guitarBData = songParts[3];
-    const drumBoxes = [...parseBoxes(drumData)];
-    const guitarABoxes = [...parseBoxes(guitarAData)];
-    const bassBoxes = [...parseBoxes(bassData)];
-    const guitarBBoxes = [...parseBoxes(guitarBData)];
+    const songTitle = match[1].trim();
+    const songParts = match[2].replace(/\s+/g, "").split(",");
+    const drumBoxes = [...parseBoxes(songParts[0])];
+    const guitarABoxes = [...parseBoxes(songParts[1])];
+    const bassBoxes = [...parseBoxes(songParts[2])];
+    const guitarBBoxes = [...parseBoxes(songParts[3])];
     callbacks.log?.("finished parsing data");
     callbacks.log?.("loading samples");
     const samplesByInstrument = {

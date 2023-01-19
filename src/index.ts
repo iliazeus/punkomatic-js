@@ -68,6 +68,8 @@ export async function renderSongInBrowser(args: {
 
   const actions = await parseSong(args.songData, { loadSample: loadCachedSample, log: args.log });
 
+  args.log?.("rendering song");
+
   const audioBuffersByPart: Record<Part, AudioBuffer> = {
     bass: audioContext.createBuffer(2, totalSampleCount, 44100),
     drums: audioContext.createBuffer(2, totalSampleCount, 44100),
@@ -181,7 +183,11 @@ export async function renderSongInBrowser(args: {
   }
 
   const finalAudioBuffer = await audioContext.startRendering();
-  return audioBufferToWavBlob(finalAudioBuffer);
+  const blob = audioBufferToWavBlob(finalAudioBuffer);
+
+  args.log?.("done rendering song");
+
+  return blob;
 }
 
 export async function playSongInBrowser(args: {
@@ -371,29 +377,18 @@ export async function parseSong<TSample extends Sample>(
 ): Promise<Iterable<Action<TSample>>> {
   callbacks.log?.("parsing data");
 
-  songData = songData.trim();
-
-  let songTitle = "PunkomaticSong";
-  const titleEndIndex = songData.indexOf(")");
-  if (titleEndIndex === -1) {
+  const match = songData.trim().match(/^\((.*)\)(.*)$/s);
+  if (!match) {
     throw new RangeError("Invalid Data: Song title was not found.");
   }
 
-  songTitle = songData.substr(1, titleEndIndex - 1).trim();
+  const songTitle = match[1]!.trim();
+  const songParts = match[2]!.replace(/\s+/g, "").split(",");
 
-  const actualData = songData.substr(titleEndIndex + 1, songData.length - titleEndIndex - 1);
-
-  const songParts = actualData.split(",");
-
-  const drumData = songParts[0];
-  const guitarAData = songParts[1];
-  const bassData = songParts[2];
-  const guitarBData = songParts[3];
-
-  const drumBoxes = [...parseBoxes(drumData)];
-  const guitarABoxes = [...parseBoxes(guitarAData)];
-  const bassBoxes = [...parseBoxes(bassData)];
-  const guitarBBoxes = [...parseBoxes(guitarBData)];
+  const drumBoxes = [...parseBoxes(songParts[0])];
+  const guitarABoxes = [...parseBoxes(songParts[1])];
+  const bassBoxes = [...parseBoxes(songParts[2])];
+  const guitarBBoxes = [...parseBoxes(songParts[3])];
 
   callbacks.log?.("finished parsing data");
 
