@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="/punkomatic.bundle.js"></script>
+    <script src="/punkomatic-js/punkomatic.bundle.js"></script>
   </head>
   <body>
     <div>
@@ -27,7 +27,7 @@
             logsDiv.innerHTML = "";
             await playSongInBrowser({
               songData: songDataTextarea.value,
-              sampleBaseUrl: "/data/",
+              sampleBaseUrl: "/punkomatic-js/data/",
               destinationNode: audioContext.destination,
               log: (text, progress) =>
                 (logsDiv.innerText = progress

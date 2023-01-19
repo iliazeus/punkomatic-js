@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="/punkomatic.bundle.js"></script>
+    <script src="/punkomatic-js/punkomatic.bundle.js"></script>
   </head>
   <body>
     <div>
@@ -29,7 +29,7 @@
             logsDiv.innerHTML = "";
             const blob = await renderSongInBrowser({
               songData: songDataTextarea.value,
-              sampleBaseUrl: "/data/",
+              sampleBaseUrl: "/punkomatic-js/data/",
               log: (text, progress) =>
                 (logsDiv.innerText = progress
                   ? `${text} (${progress.current}/${progress.total})`
