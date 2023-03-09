@@ -27,7 +27,7 @@
           try {
             convertButton.disabled = true;
             logsDiv.innerHTML = "";
-            const blob = await renderSongInBrowser({
+            const blob = await PunkomaticJs.renderSongInBrowser({
               songData: songDataTextarea.value,
               sampleBaseUrl: "/punkomatic-js/data/",
               log: (text, progress) =>

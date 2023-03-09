@@ -2102,17 +2102,3 @@ const LAST_LEAD_INDEX = sampleFilesByInstrument.guitar.indexOf(
 const EXTRA_LEAD_INDEX = sampleFilesByInstrument.guitar.indexOf(
   "Guitars/GuitLeadSpecialClassicE0727.mp3"
 );
-
-declare global {
-  interface Window {
-    playSongInBrowser: typeof playSongInBrowser;
-    renderSongInBrowser: typeof renderSongInBrowser;
-    initPlayerButtonElement: typeof initPlayerButtonElement;
-  }
-}
-
-if (typeof window !== "undefined") {
-  window.playSongInBrowser = playSongInBrowser;
-  window.renderSongInBrowser = renderSongInBrowser;
-  window.initPlayerButtonElement = initPlayerButtonElement;
-}

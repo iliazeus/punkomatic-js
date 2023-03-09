@@ -1,12 +1,9 @@
 {
   "name": "punkomatic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "a tool to parse Punk-O-Matic 2 song data",
-  "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node -r source-map-support/register ./dist/node.js",
-    "bundle": "tsc && browserify dist/index.js -o punkomatic.bundle.js"
+    "build": "./scripts/build.sh"
   },
   "repository": {
     "type": "git",
@@ -25,8 +22,7 @@
   "devDependencies": {
     "@types/node": "^18.11.18",
     "@types/webaudioapi": "^0.0.27",
-    "browserify": "^17.0.0",
-    "http-server": "^14.1.1",
+    "esbuild": "^0.17.11",
     "prettier": "^2.8.3",
     "source-map-support": "^0.5.21",
     "typescript": "^4.9.4"

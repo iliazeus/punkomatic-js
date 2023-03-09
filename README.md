@@ -24,24 +24,24 @@ The simplest way is to include the `punkomatic.bundle.js` in the `<head>`:
 <script src="punkomatic.bundle.js"></script>
 ```
 
-It provides these global functions:
+It provides these functions:
 
 ```ts
 // render song to a WAV blob to download or play using <audio>
-function renderSongInBrowser(args: {
+function PunkomaticJs.renderSongInBrowser(args: {
   songData: string; // song data from the "get data" screen of Punk-O-Matic 2
   sampleBaseUrl: string; // url to where the `data` folder from POM Converter is
 }): Promise<Blob>; // returns a WAV blob
 
 // initialize a `Play/Stop` button that plays the song in real time
-function initPlayerButtonElement(args: {
+function PunkomaticJs.initPlayerButtonElement(args: {
   element: HTMLElement; // a button to use
   songData: string; // song data from the "get data" screen of Punk-O-Matic 2
   sampleBaseUrl: string; // url to where the `data` folder from POM Converter is
 }): void;
 
 // play the song in real time
-function playSongInBrowser(args: {
+function PunkomaticJs.playSongInBrowser(args: {
   songData: string; // song data from the "get data" screen of Punk-O-Matic 2
   sampleBaseUrl: string; // url to where the `data` folder from POM converter is
   destinationNode: AudioNode; // where to put audio data

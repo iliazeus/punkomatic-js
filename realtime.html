@@ -25,7 +25,7 @@
           try {
             playButton.disabled = true;
             logsDiv.innerHTML = "";
-            await playSongInBrowser({
+            await PunkomaticJs.playSongInBrowser({
               songData: songDataTextarea.value,
               sampleBaseUrl: "/punkomatic-js/data/",
               destinationNode: audioContext.destination,
