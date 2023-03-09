@@ -153,7 +153,17 @@ export async function renderSongInBrowser(args: {
 
     if (action.type === "volume") {
       const gain = gainNodesByPart[action.part];
-      gain.gain.setValueAtTime(action.volume, action.time);
+
+      if (currentSamplesByPart[action.part]) {
+        gain.gain.setValueAtTime(action.volume, action.time);
+      } else {
+        gainNodesByPart[action.part].gain.setTargetAtTime(
+          action.volume,
+          action.time,
+          NOTE_ONSET_DURATION
+        );
+      }
+
       continue;
     }
 
@@ -170,6 +180,12 @@ export async function renderSongInBrowser(args: {
     }
 
     if (action.type === "stop") {
+      gainNodesByPart[action.part].gain.setTargetAtTime(
+        0,
+        action.time - NOTE_CUTOFF_DURATION,
+        NOTE_CUTOFF_DURATION
+      );
+
       currentSamplesByPart[action.part] = null;
       startSampleIndicesByPart[action.part] = action.sampleIndex;
       continue;
@@ -282,7 +298,17 @@ export async function playSongInBrowser(args: {
 
       if (action.type === "volume") {
         const gain = gainNodesByPart[action.part];
-        gain.gain.setValueAtTime(action.volume, startTime + action.time);
+
+        if (currentSourceNodesByPart[action.part]) {
+          gain.gain.setValueAtTime(action.volume, action.time);
+        } else {
+          gainNodesByPart[action.part].gain.setTargetAtTime(
+            action.volume,
+            action.time,
+            NOTE_ONSET_DURATION
+          );
+        }
+
         continue;
       }
 
@@ -304,6 +330,12 @@ export async function playSongInBrowser(args: {
       }
 
       if (action.type === "stop") {
+        gainNodesByPart[action.part].gain.setTargetAtTime(
+          0,
+          action.time - NOTE_CUTOFF_DURATION,
+          NOTE_CUTOFF_DURATION
+        );
+
         const source = currentSourceNodesByPart[action.part]!;
         source.stop(startTime + action.time);
         currentSourceNodesByPart[action.part] = null;
@@ -378,6 +410,9 @@ const OFFSET_INTO_SAMPLE = 1300;
 const ALTERNATE_OFFSET_INTO_SAMPLE = 1700;
 
 const MASTER_VOLUME = 0.8;
+
+const NOTE_ONSET_DURATION = 0.02;
+const NOTE_CUTOFF_DURATION = 0.02;
 
 const BASE_VOLUME_BY_INSTRUMENT: Record<Instrument, number> = {
   drums: 1.9,

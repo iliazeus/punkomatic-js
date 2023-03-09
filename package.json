@@ -1,6 +1,6 @@
 {
   "name": "punkomatic",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "a tool to parse Punk-O-Matic 2 song data",
   "scripts": {
     "build": "./scripts/build.sh"
