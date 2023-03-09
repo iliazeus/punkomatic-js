@@ -131,7 +131,9 @@ export async function renderSongInBrowser(args: {
         if (!sample) continue;
 
         const offsetIntoSample =
-          OFFSET_INTO_SAMPLE + currentSampleIndex - startSampleIndicesByPart[part as Part];
+          (part === "guitarB" ? ALTERNATE_OFFSET_INTO_SAMPLE : OFFSET_INTO_SAMPLE) +
+          currentSampleIndex -
+          startSampleIndicesByPart[part as Part];
 
         const partBuffer = audioBuffersByPart[part as Part];
 
@@ -205,20 +207,38 @@ export async function playSongInBrowser(args: {
     const rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
     // TODO: reimplement
-    const audioBuffer = audioContext.createBuffer(
+    const regularAudioBuffer = audioContext.createBuffer(
       2,
       rawAudioBuffer.length - OFFSET_INTO_SAMPLE,
       44100
     );
 
-    const temp = new Float32Array(audioBuffer.length);
+    let temp = new Float32Array(regularAudioBuffer.length);
 
-    for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+    for (let c = 0; c < regularAudioBuffer.numberOfChannels; c++) {
       rawAudioBuffer.copyFromChannel(temp, c, OFFSET_INTO_SAMPLE);
-      audioBuffer.copyToChannel(temp, c, 0);
+      regularAudioBuffer.copyToChannel(temp, c, 0);
     }
 
-    return audioBuffer;
+    const alternateAudioBUffer = audioContext.createBuffer(
+      2,
+      rawAudioBuffer.length - ALTERNATE_OFFSET_INTO_SAMPLE,
+      44100
+    );
+
+    temp = new Float32Array(alternateAudioBUffer.length);
+
+    for (let c = 0; c < alternateAudioBUffer.numberOfChannels; c++) {
+      rawAudioBuffer.copyFromChannel(temp, c, ALTERNATE_OFFSET_INTO_SAMPLE);
+      alternateAudioBUffer.copyToChannel(temp, c, 0);
+    }
+
+    return {
+      length: regularAudioBuffer.length,
+      duration: regularAudioBuffer.duration,
+      regularAudio: regularAudioBuffer,
+      alternateAudio: alternateAudioBUffer,
+    };
   };
 
   const actions = await parseSong(args.songData, { loadSample, log: args.log });
@@ -274,8 +294,8 @@ export async function playSongInBrowser(args: {
       if (action.type === "play") {
         currentSourceNodesByPart[action.part]?.stop(startTime + action.time);
         const source = audioContext.createBufferSource();
-        source.buffer = action.sample;
-        // source.
+        source.buffer =
+          action.part === "guitarB" ? action.sample.alternateAudio : action.sample.regularAudio;
         source.connect(gainNodesByPart[action.part]);
         source.start(startTime + action.time);
         source.onended = () => source.disconnect(gainNodesByPart[action.part]);
@@ -355,6 +375,7 @@ export type Action<TSample extends Sample> =
 const BOX_DURATION = 62259 / (2 * 44100);
 const BOX_SAMPLE_COUNT = 62258 / 2;
 const OFFSET_INTO_SAMPLE = 1300;
+const ALTERNATE_OFFSET_INTO_SAMPLE = 1700;
 
 const MASTER_VOLUME = 0.8;
 
