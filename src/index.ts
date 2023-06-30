@@ -4,7 +4,7 @@ import {
   LAST_LEAD_INDEX,
   sampleFilesByInstrument,
 } from "./sample-files";
-import { audioBufferToWavBlob, parseBase52 } from "./util";
+import { audioBufferToWavFile, parseBase52 } from "./util";
 
 export function initPlayerButtonElement(args: {
   element: HTMLElement;
@@ -129,6 +129,7 @@ export async function renderSongInBrowser(args: {
   };
 
   let currentSampleIndex = 0;
+  let songTitle: string | null = null;
 
   for (const action of actions) {
     if (currentSampleIndex < action.sampleIndex) {
@@ -156,6 +157,7 @@ export async function renderSongInBrowser(args: {
     }
 
     if (action.type === "start") {
+      songTitle = action.title;
       continue;
     }
 
@@ -209,7 +211,7 @@ export async function renderSongInBrowser(args: {
   }
 
   const finalAudioBuffer = await audioContext.startRendering();
-  const blob = audioBufferToWavBlob(finalAudioBuffer);
+  const blob = audioBufferToWavFile(songTitle || "song", finalAudioBuffer);
 
   args.log?.("done rendering song");
 
@@ -376,6 +378,7 @@ export type Action<TSample extends Sample> =
       time: number;
       sampleIndex: number;
       type: "start";
+      title: string;
       totalDuration: number;
       totalSampleCount: number;
     }
@@ -491,7 +494,7 @@ export async function parseSong<TSample extends Sample>(
     })),
   ].sort((a, b) => a.time - b.time);
 
-  return emitActions(boxQueue, samplesByInstrument);
+  return emitActions(songTitle, boxQueue, samplesByInstrument);
 }
 
 type Box = { type: "sample"; index: number } | { type: "stop" } | { type: "empty"; length: number };
@@ -578,6 +581,7 @@ function* timeBoxes(boxes: Iterable<Box>): Iterable<Box & { time: number; sample
 }
 
 function* emitActions<TSample extends Sample>(
+  songTitle: string,
   boxQueue: Array<Box & { instrument: Instrument; part: Part; time: number; sampleIndex: number }>,
   samplesByInstrument: Record<Instrument, Map<number, TSample>>
 ): Iterable<Action<TSample>> {
@@ -620,7 +624,14 @@ function* emitActions<TSample extends Sample>(
     }
   }
 
-  yield { time: 0, sampleIndex: 0, type: "start", totalDuration, totalSampleCount };
+  yield {
+    time: 0,
+    sampleIndex: 0,
+    type: "start",
+    title: songTitle,
+    totalDuration,
+    totalSampleCount,
+  };
 
   yield { time: 0, sampleIndex: 0, type: "pan", part: "guitarA", pan: -GUITAR_PANNING };
   yield { time: 0, sampleIndex: 0, type: "pan", part: "guitarB", pan: +GUITAR_PANNING };

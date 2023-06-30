@@ -17,7 +17,7 @@ export function parseBase52(data: string): number {
 }
 
 // adapted from https://stackoverflow.com/a/30045041
-export function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
+export function audioBufferToWavFile(name: string, audioBuffer: AudioBuffer): Blob {
   const wavByteLength = 44 + 2 * audioBuffer.numberOfChannels * audioBuffer.length;
   const wavArrayBuffer = new ArrayBuffer(wavByteLength);
   const wavDataView = new DataView(wavArrayBuffer);
@@ -72,5 +72,5 @@ export function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
     }
   }
 
-  return new Blob([wavArrayBuffer], { type: "audio/wav" });
+  return new File([wavArrayBuffer], `${name}.wav`, { type: "audio/wav" });
 }
