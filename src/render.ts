@@ -4,12 +4,13 @@ import {
   LAST_LEAD_INDEX,
   sampleFilesByInstrument,
 } from "./sample-files";
-import { audioBufferToWavFile, parseBase52 } from "./util";
+import { audioBufferToWavFile, audioBufferToLossyFile, parseBase52 } from "./util";
 
 export async function renderSongImpl(args: {
   songData: string;
   sampleDir: string;
   loadSampleData: (uri: string) => Promise<ArrayBuffer>;
+  compress?: boolean;
   log?: (state: string, progress?: { current: number; total: number }) => void;
 }): Promise<Blob> {
   const dummyAudioContext = new OfflineAudioContext({
@@ -183,7 +184,14 @@ export async function renderSongImpl(args: {
   }
 
   const finalAudioBuffer = await audioContext.startRendering();
-  const blob = audioBufferToWavFile(songTitle || "song", finalAudioBuffer);
+
+  let blob: Blob;
+  if (args.compress) {
+    args.log?.("compressing song");
+    blob = await audioBufferToLossyFile(songTitle || "song", finalAudioBuffer);
+  } else {
+    blob = audioBufferToWavFile(songTitle || "song", finalAudioBuffer);
+  }
 
   args.log?.("done rendering song");
 

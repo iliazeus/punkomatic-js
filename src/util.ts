@@ -1,3 +1,32 @@
+export async function audioBufferToLossyFile(name: string, input: AudioBuffer): Promise<Blob> {
+  type LibAV = typeof import("../dist/libav.types.d.ts").default;
+  const LibAV: LibAV = (await import("libav.js" as any)).default;
+
+  const libav = await LibAV.LibAV({ nothreads: true });
+
+  try {
+    const asBytes = (a: Float32Array) => new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+    await libav.writeFile("input-0.pcm", asBytes(input.getChannelData(0)));
+    await libav.writeFile("input-1.pcm", asBytes(input.getChannelData(1)));
+
+    // prettier-ignore
+    await libav.ffmpeg(
+      "-hide_banner", "-nostdin",
+      "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "input-0.pcm",
+      "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "input-1.pcm",
+      "-filter_complex", "[0][1]amerge[out]", "-map", "[out]",
+      "-f", "mp4", "-acodec", "aac", "-ar", "48000", "output.m4a",
+    );
+
+    const outputBytes = await libav.readFile("output.m4a");
+    return new File([outputBytes], `${name}.m4a`, { type: "audio/mp4" });
+  } finally {
+    await libav.unlink("input.0.pcm").catch(() => {});
+    await libav.unlink("input.1.pcm").catch(() => {});
+    await libav.unlink("output.m4a").catch(() => {});
+  }
+}
+
 export function parseBase52(data: string): number {
   const lowerA = "a".charCodeAt(0);
   const lowerZ = "z".charCodeAt(0);
@@ -17,7 +46,7 @@ export function parseBase52(data: string): number {
 }
 
 // adapted from https://stackoverflow.com/a/30045041
-export function audioBufferToWavFile(name: string, audioBuffer: AudioBuffer): Blob {
+export function audioBufferToWavFile(name: string, audioBuffer: AudioBuffer): File {
   const wavByteLength = 44 + 2 * audioBuffer.numberOfChannels * audioBuffer.length;
   const wavArrayBuffer = new ArrayBuffer(wavByteLength);
   const wavDataView = new DataView(wavArrayBuffer);

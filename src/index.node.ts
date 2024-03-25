@@ -7,6 +7,7 @@ import { renderSongImpl } from "./render";
 export async function renderSong(args: {
   songData: string;
   sampleDir: string;
+  compress?: boolean;
   log?: (state: string, progress?: { current: number; total: number }) => void;
 }): Promise<Blob> {
   return renderSongImpl({

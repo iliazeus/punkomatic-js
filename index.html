@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="/punkomatic-js/punkomatic.bundle.js"></script>
   </head>
   <body>
     <div>
       <textarea id="song-data-textarea" placeholder="Put your song data here"></textarea>
     </div>
     <div>
-      <button id="convert-button">Convert</button>
+      <button id="convert-button">Convert to WAV</button>
+      <button id="compress-button">Convert and compress</button>
     </div>
     <div>
       <audio id="audio" controls></audio>
@@ -19,19 +19,23 @@
     <script type="module">
       import * as pm from "./dist/punkomatic.browser.js";
 
-      window.onload = () => {
-        const songDataTextarea = document.getElementById("song-data-textarea");
-        const convertButton = document.getElementById("convert-button");
-        const audioElement = document.getElementById("audio");
-        const logsDiv = document.getElementById("logs-div");
+      const songDataTextarea = document.getElementById("song-data-textarea");
+      const convertButton = document.getElementById("convert-button");
+      const compressButton = document.getElementById("compress-button");
+      const audioElement = document.getElementById("audio");
+      const logsDiv = document.getElementById("logs-div");
 
-        convertButton.onclick = async () => {
+      const render =
+        ({ compress }) =>
+        async () => {
           try {
             convertButton.disabled = true;
+            document.querySelectorAll("button").forEach((el) => (el.disabled = true));
             logsDiv.innerHTML = "";
             const blob = await pm.renderSong({
               songData: songDataTextarea.value,
               sampleDir: "./data",
+              compress,
               log: (text, progress) =>
                 (logsDiv.innerText = progress
                   ? `${text} (${progress.current}/${progress.total})`
@@ -39,14 +43,16 @@
             });
             const url = URL.createObjectURL(blob);
             audioElement.src = url;
-            logsDiv.innerHTML = `<a download href="${url}" filename="song.wav">Download WAV</a>`;
+            logsDiv.innerHTML = `<a download href="${url}">Download</a>`;
           } catch (error) {
             logsDiv.innerText = String(error);
           } finally {
-            convertButton.disabled = false;
+            document.querySelectorAll("button").forEach((el) => (el.disabled = false));
           }
         };
-      };
+
+      convertButton.onclick = render({ compress: false });
+      compressButton.onclick = render({ compress: true });
     </script>
   </body>
 </html>

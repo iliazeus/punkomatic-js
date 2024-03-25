@@ -28,6 +28,7 @@ All other code and assets are published under the [MIT license].
   const blob = await pm.renderSong({
     sampleDir: "./path-to/samples",
     songData: "<your song data here>",
+    compress: true, // slower, but file takes less space
   }); // returns a Promise<Blob>
 
   // to play or download it:
@@ -39,14 +40,13 @@ All other code and assets are published under the [MIT license].
 #### In Node
 
 ```ts
-// CommonJS
-const pm = require("punkomatic-js");
-// ESM
+// ESM only
 import * as pm from "punkomatic.js";
 
 const blob = await pm.renderSong({
   sampleDir: "./path-to/samples",
   songData: "<your song data here>",
+  compress: true, // slower, but file takes less space; may currently be broken in Node
 }); // returns a Promise<Blob>
 
 // to write it to a file:

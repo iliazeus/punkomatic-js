@@ -1,13 +1,16 @@
 {
   "name": "punkomatic",
+  "type": "module",
   "exports": {
     "node": "./dist/punkomatic-node.js",
     "browser": "./dist/punkomatic-browser.js"
   },
   "version": "0.3.0",
-  "description": "a tool to parse Punk-O-Matic 2 song data",
+  "description": "a tool to parse and render Punk-O-Matic 2 song data",
   "scripts": {
-    "build": "./scripts/build.sh"
+    "build": "./scripts/build.sh",
+    "libav-build": "./scripts/libav-build.sh",
+    "serve": "npx esbuild --serve=127.0.0.1:8080 --servedir=."
   },
   "repository": {
     "type": "git",
