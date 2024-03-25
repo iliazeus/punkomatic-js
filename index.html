@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -16,7 +16,9 @@
       <audio id="audio" controls></audio>
     </div>
     <div id="logs-div"></div>
-    <script>
+    <script type="module">
+      import * as pm from "./dist/punkomatic.browser.js";
+
       window.onload = () => {
         const songDataTextarea = document.getElementById("song-data-textarea");
         const convertButton = document.getElementById("convert-button");
@@ -27,9 +29,9 @@
           try {
             convertButton.disabled = true;
             logsDiv.innerHTML = "";
-            const blob = await PunkomaticJs.renderSongInBrowser({
+            const blob = await pm.renderSong({
               songData: songDataTextarea.value,
-              sampleBaseUrl: "/punkomatic-js/data/",
+              sampleDir: "./data",
               log: (text, progress) =>
                 (logsDiv.innerText = progress
                   ? `${text} (${progress.current}/${progress.total})`

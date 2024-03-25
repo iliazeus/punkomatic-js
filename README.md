@@ -18,32 +18,38 @@ All other code and assets are published under the [MIT license].
 [in the repo]: https://github.com/iliazeus/punkomatic-js/tree/master/data
 [MIT license]: https://github.com/iliazeus/punkomatic-js/tree/master/LICENSE
 
-The simplest way is to include the `punkomatic.bundle.js` in the `<head>`:
+#### In browser
 
 ```html
-<script src="punkomatic.bundle.js"></script>
+<script type="module">
+  import * as pm from "./punkomatic.browser.js";
+
+  // render a song to a WAV blob
+  const blob = await pm.renderSong({
+    sampleDir: "./path-to/samples",
+    songData: "<your song data here>",
+  }); // returns a Promise<Blob>
+
+  // to play or download it:
+  const url = URL.createObjectUrl(blob);
+  document.querySelector("audio#my-song").src = url;
+</script>
 ```
 
-It provides these functions:
+#### In Node
 
 ```ts
-// render song to a WAV blob to download or play using <audio>
-function PunkomaticJs.renderSongInBrowser(args: {
-  songData: string; // song data from the "get data" screen of Punk-O-Matic 2
-  sampleBaseUrl: string; // url to where the `data` folder from POM Converter is
-}): Promise<Blob>; // returns a WAV blob
+// CommonJS
+const pm = require("punkomatic-js");
+// ESM
+import * as pm from "punkomatic.js";
 
-// initialize a `Play/Stop` button that plays the song in real time
-function PunkomaticJs.initPlayerButtonElement(args: {
-  element: HTMLElement; // a button to use
-  songData: string; // song data from the "get data" screen of Punk-O-Matic 2
-  sampleBaseUrl: string; // url to where the `data` folder from POM Converter is
-}): void;
+const blob = await pm.renderSong({
+  sampleDir: "./path-to/samples",
+  songData: "<your song data here>",
+}); // returns a Promise<Blob>
 
-// play the song in real time
-function PunkomaticJs.playSongInBrowser(args: {
-  songData: string; // song data from the "get data" screen of Punk-O-Matic 2
-  sampleBaseUrl: string; // url to where the `data` folder from POM converter is
-  destinationNode: AudioNode; // where to put audio data
-}): Promise<void>; // resolves when the song is finished
+// to write it to a file:
+const fs = require("node:fs/promises");
+await fs.writeFile("output.wav", new Buffer(await blob.arrayBuffer()));
 ```
