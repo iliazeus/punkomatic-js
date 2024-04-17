@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <h1>Punk-O-Matic 2 Online MP3 Converter</h1>
+    <p>
+      Source code is available at
+      <a rel="author" href="https://github.com/iliazeus/punkomatic-js">
+        https://github.com/iliazeus/punkomatic-js
+      </a>
+    </p>
+    <div>
+      <button id="convert-button">Convert to WAV (faster; huge file)</button>
+      <button id="compress-button">Convert to MP3 (slower; small file)</button>
+    </div>
+    <div>
+      <audio id="audio" controls></audio>
+    </div>
+    <div id="status-div"></div>
+    <div>
+      <textarea
+        id="song-data-textarea"
+        style="width: 100%"
+        rows="20"
+        placeholder="Put your song data here"
+      ></textarea>
+    </div>
+    <script type="module">
+      import * as pm from "./dist/punkomatic.browser.js";
+
+      const songDataTextarea = document.getElementById("song-data-textarea");
+      const convertButton = document.getElementById("convert-button");
+      const compressButton = document.getElementById("compress-button");
+      const audioElement = document.getElementById("audio");
+      const statusDiv = document.getElementById("status-div");
+
+      const render =
+        ({ compress }) =>
+        async () => {
+          try {
+            convertButton.disabled = true;
+            document.querySelectorAll("button").forEach((el) => (el.disabled = true));
+            statusDiv.innerHTML = "";
+            const blob = await pm.renderSong({
+              songData: songDataTextarea.value,
+              sampleDir: "./data",
+              compress,
+              log: (text, progress) =>
+                (statusDiv.innerText = progress
+                  ? `${text} (${progress.current}/${progress.total})`
+                  : text),
+            });
+            const url = URL.createObjectURL(blob);
+            audioElement.src = url;
+            statusDiv.innerHTML = `<a download href="${url}">Download</a>`;
+          } catch (error) {
+            statusDiv.innerText = String(error);
+          } finally {
+            document.querySelectorAll("button").forEach((el) => (el.disabled = false));
+          }
+        };
+
+      convertButton.onclick = render({ compress: false });
+      compressButton.onclick = render({ compress: true });
+    </script>
+  </body>
+</html>
