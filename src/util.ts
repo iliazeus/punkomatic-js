@@ -1,6 +1,6 @@
 import { initFfmpeg } from "./cross-ffmpeg.js";
 
-export async function audioBufferToLossyFile(name: string, input: AudioBuffer): Promise<Blob> {
+export async function audioBufferToLossyFile(name: string, input: AudioBuffer): Promise<File> {
   const ffmpeg = await initFfmpeg();
 
   try {

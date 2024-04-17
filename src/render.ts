@@ -12,7 +12,7 @@ export async function renderSongImpl(args: {
   loadSampleData: (uri: string) => Promise<ArrayBuffer>;
   compress?: boolean;
   log?: (state: string, progress?: { current: number; total: number }) => void;
-}): Promise<Blob> {
+}): Promise<File> {
   const dummyAudioContext = new OfflineAudioContext({
     length: 1 * 44100,
     sampleRate: 44100,
@@ -193,17 +193,17 @@ export async function renderSongImpl(args: {
     }
   }
 
-  let blob: Blob;
+  let file: File;
   if (args.compress) {
     args.log?.("compressing song");
-    blob = await audioBufferToLossyFile(songTitle || "song", finalAudioBuffer);
+    file = await audioBufferToLossyFile(songTitle || "song", finalAudioBuffer);
   } else {
-    blob = audioBufferToWavFile(songTitle || "song", finalAudioBuffer);
+    file = audioBufferToWavFile(songTitle || "song", finalAudioBuffer);
   }
 
   args.log?.("done rendering song");
 
-  return blob;
+  return file;
 }
 
 export type Part = "drums" | "guitarA" | "bass" | "guitarB";

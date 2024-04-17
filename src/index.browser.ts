@@ -5,7 +5,7 @@ export async function renderSong(args: {
   sampleDir: string;
   compress?: boolean;
   log?: (state: string, progress?: { current: number; total: number }) => void;
-}): Promise<Blob> {
+}): Promise<File> {
   return renderSongImpl({
     ...args,
     loadSampleData: async (uri) => {

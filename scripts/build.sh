@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euxo pipefail
 
 rm -f ./dist/punkomatic.*.js
@@ -17,3 +17,11 @@ esbuild \
   --alias:libav.js=./dist/libav-5.1.6.1.1-punkomatic.mjs \
   ./src/index.node.ts \
   --outfile=./dist/punkomatic.node.js
+
+esbuild \
+  --platform=node --format=esm \
+  --bundle --packages=external --minify --sourcemap --charset=utf8 \
+  --alias:libav.js=./dist/libav-5.1.6.1.1-punkomatic.mjs \
+  --loader:.html=text \
+  ./src/server.node.ts \
+  --outfile=./dist/server.node.js

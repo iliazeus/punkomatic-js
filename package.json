@@ -5,12 +5,13 @@
     "node": "./dist/punkomatic-node.js",
     "browser": "./dist/punkomatic-browser.js"
   },
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "a tool to parse and render Punk-O-Matic 2 song data",
   "scripts": {
     "build": "./scripts/build.sh",
     "libav-build": "./scripts/libav-build.sh",
-    "serve": "npx esbuild --serve=127.0.0.1:8080 --servedir=."
+    "serve": "node ./dist/server.node.js",
+    "serve-static": "npx esbuild --serve=127.0.0.1:8080 --servedir=."
   },
   "repository": {
     "type": "git",
@@ -27,6 +28,8 @@
   },
   "homepage": "https://github.com/iliazeus/punkomatic-js#readme",
   "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/node": "^20.11.30",
     "@types/webaudioapi": "^0.0.27",
     "esbuild": "^0.20.2",
@@ -35,6 +38,8 @@
     "typescript": "^5.4.3"
   },
   "optionalDependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
     "ffmpeg-static": "^5.2.0",
     "node-web-audio-api": "^0.19.0"
   }
