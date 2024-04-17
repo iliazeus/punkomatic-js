@@ -1,16 +1,15 @@
-export async function audioBufferToLossyFile(name: string, input: AudioBuffer): Promise<Blob> {
-  type LibAV = typeof import("../dist/libav.types.d.ts").default;
-  const LibAV: LibAV = (await import("libav.js" as any)).default;
+import { initFfmpeg } from "./cross-ffmpeg.js";
 
-  const libav = await LibAV.LibAV({ nothreads: true });
+export async function audioBufferToLossyFile(name: string, input: AudioBuffer): Promise<Blob> {
+  const ffmpeg = await initFfmpeg();
 
   try {
     const asBytes = (a: Float32Array) => new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
-    await libav.writeFile("input-0.pcm", asBytes(input.getChannelData(0)));
-    await libav.writeFile("input-1.pcm", asBytes(input.getChannelData(1)));
+    await ffmpeg.writeFile("input-0.pcm", asBytes(input.getChannelData(0)));
+    await ffmpeg.writeFile("input-1.pcm", asBytes(input.getChannelData(1)));
 
     // prettier-ignore
-    await libav.ffmpeg(
+    await ffmpeg.ffmpeg(
       "-hide_banner", "-nostdin",
       "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "input-0.pcm",
       "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "input-1.pcm",
@@ -18,12 +17,13 @@ export async function audioBufferToLossyFile(name: string, input: AudioBuffer): 
       "-f", "mp4", "-acodec", "aac", "-ar", "48000", "output.m4a",
     );
 
-    const outputBytes = await libav.readFile("output.m4a");
+    const outputBytes = await ffmpeg.readFile("output.m4a");
     return new File([outputBytes], `${name}.m4a`, { type: "audio/mp4" });
   } finally {
-    await libav.unlink("input.0.pcm").catch(() => {});
-    await libav.unlink("input.1.pcm").catch(() => {});
-    await libav.unlink("output.m4a").catch(() => {});
+    await ffmpeg.unlink("input.0.pcm").catch(() => {});
+    await ffmpeg.unlink("input.1.pcm").catch(() => {});
+    await ffmpeg.unlink("output.m4a").catch(() => {});
+    await ffmpeg.cleanup?.();
   }
 }
 
