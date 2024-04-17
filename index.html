@@ -5,17 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
+    <h1>Punk-O-Matic 2 Online MP3 Converter</h1>
+    <p>
+      Source code is available at
+      <a rel="author" href="https://github.com/iliazeus/punkomatic-js">
+        https://github.com/iliazeus/punkomatic-js
+      </a>
+    </p>
     <div>
-      <textarea id="song-data-textarea" placeholder="Put your song data here"></textarea>
-    </div>
-    <div>
-      <button id="convert-button">Convert to WAV (fast; huge file)</button>
-      <button id="compress-button">Convert to MP3 (slow; small file)</button>
+      <button id="convert-button">Convert to WAV (faster; huge file)</button>
+      <button id="compress-button">Convert to MP3 (slower; small file)</button>
     </div>
     <div>
       <audio id="audio" controls></audio>
     </div>
-    <div id="logs-div"></div>
+    <div id="status-div"></div>
+    <div>
+      <textarea
+        id="song-data-textarea"
+        style="width: 100%"
+        rows="20"
+        placeholder="Put your song data here"
+      ></textarea>
+    </div>
     <script type="module">
       import * as pm from "./dist/punkomatic.browser.js";
 
@@ -23,7 +35,7 @@
       const convertButton = document.getElementById("convert-button");
       const compressButton = document.getElementById("compress-button");
       const audioElement = document.getElementById("audio");
-      const logsDiv = document.getElementById("logs-div");
+      const statusDiv = document.getElementById("status-div");
 
       const render =
         ({ compress }) =>
@@ -31,21 +43,21 @@
           try {
             convertButton.disabled = true;
             document.querySelectorAll("button").forEach((el) => (el.disabled = true));
-            logsDiv.innerHTML = "";
+            statusDiv.innerHTML = "";
             const blob = await pm.renderSong({
               songData: songDataTextarea.value,
               sampleDir: "./data",
               compress,
               log: (text, progress) =>
-                (logsDiv.innerText = progress
+                (statusDiv.innerText = progress
                   ? `${text} (${progress.current}/${progress.total})`
                   : text),
             });
             const url = URL.createObjectURL(blob);
             audioElement.src = url;
-            logsDiv.innerHTML = `<a download href="${url}">Download</a>`;
+            statusDiv.innerHTML = `<a download href="${url}">Download</a>`;
           } catch (error) {
-            logsDiv.innerText = String(error);
+            statusDiv.innerText = String(error);
           } finally {
             document.querySelectorAll("button").forEach((el) => (el.disabled = false));
           }
