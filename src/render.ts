@@ -135,14 +135,14 @@ export async function renderSongImpl(args: {
       continue;
     }
 
-    if (action.type === "volume") {
+    if (action.type === "gain") {
       const gain = gainNodesByPart[action.part];
 
       if (currentSamplesByPart[action.part]) {
-        gain.gain.setValueAtTime(action.volume, action.time);
+        gain.gain.setValueAtTime(action.gain, action.time);
       } else {
         gainNodesByPart[action.part].gain.setTargetAtTime(
-          action.volume,
+          action.gain,
           action.time,
           NOTE_ONSET_DURATION,
         );
@@ -185,6 +185,14 @@ export async function renderSongImpl(args: {
 
   const finalAudioBuffer = await audioContext.startRendering();
 
+  // helps to get rid of artifacts when using node-web-audio-api
+  for (let c = 0; c < finalAudioBuffer.numberOfChannels; c++) {
+    const data = finalAudioBuffer.getChannelData(c);
+    for (let i = 1; i < data.length; i++) {
+      if (data[i] >= 1.0 || data[i] <= -1.0) data[i] = data[i - 1];
+    }
+  }
+
   let blob: Blob;
   if (args.compress) {
     args.log?.("compressing song");
@@ -218,9 +226,9 @@ export type Action<TSample extends Sample> =
   | {
       time: number;
       sampleIndex: number;
-      type: "volume";
+      type: "gain";
       part: Part;
-      volume: number;
+      gain: number;
     }
   | {
       time: number;
@@ -253,18 +261,18 @@ const BOX_SAMPLE_COUNT = 62258 / 2;
 const OFFSET_INTO_SAMPLE = 1300;
 const ALTERNATE_OFFSET_INTO_SAMPLE = 1700;
 
-const MASTER_VOLUME = 0.8;
+const MASTER_GAIN = 0.5;
 
 const NOTE_ONSET_DURATION = 0.02;
 const NOTE_CUTOFF_DURATION = 0.02;
 
-const BASE_VOLUME_BY_INSTRUMENT: Record<Instrument, number> = {
+const BASE_GAIN_BY_INSTRUMENT: Record<Instrument, number> = {
   drums: 1.9,
   bass: 1.7,
   guitar: 2.2,
 };
 
-const LEAD_GUITAR_VOLUME = 1.08;
+const LEAD_GUITAR_GAIN = 1.08;
 const GUITAR_MIXING_LEVEL = 0.85;
 const GUITAR_PANNING = 0.75;
 
@@ -488,13 +496,13 @@ function* emitActions<TSample extends Sample>(
       currentSampleStartTimes[box.part] = box.time;
       currentPartEndTimes[box.part] = box.time + sample.duration;
 
-      let volume = MASTER_VOLUME * BASE_VOLUME_BY_INSTRUMENT[box.instrument];
+      let gain = MASTER_GAIN * BASE_GAIN_BY_INSTRUMENT[box.instrument];
 
       if (
         (FIRST_LEAD_INDEX <= box.index && box.index <= LAST_LEAD_INDEX) ||
         box.index === EXTRA_LEAD_INDEX
       ) {
-        volume *= LEAD_GUITAR_VOLUME;
+        gain *= LEAD_GUITAR_GAIN;
       }
 
       if (
@@ -502,29 +510,29 @@ function* emitActions<TSample extends Sample>(
         currentSampleIndices["guitarA"] === currentSampleIndices["guitarB"] &&
         currentSampleStartTimes["guitarA"] == currentSampleStartTimes["guitarB"]
       ) {
-        volume *= GUITAR_MIXING_LEVEL;
+        gain *= GUITAR_MIXING_LEVEL;
 
         yield {
           part: "guitarA",
           time: box.time,
           sampleIndex: box.sampleIndex,
-          type: "volume",
-          volume: volume,
+          type: "gain",
+          gain: gain,
         };
         yield {
           part: "guitarB",
           time: box.time,
           sampleIndex: box.sampleIndex,
-          type: "volume",
-          volume: volume,
+          type: "gain",
+          gain: gain,
         };
       } else {
         yield {
           part: box.part,
           time: box.time,
           sampleIndex: box.sampleIndex,
-          type: "volume",
-          volume,
+          type: "gain",
+          gain,
         };
       }
 

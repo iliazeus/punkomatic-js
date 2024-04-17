@@ -14,15 +14,19 @@ export async function audioBufferToLossyFile(name: string, input: AudioBuffer): 
       "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "input-0.pcm",
       "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "input-1.pcm",
       "-filter_complex", "[0][1]amerge[out]", "-map", "[out]",
-      "-f", "mp4", "-acodec", "aac", "-ar", "48000", "output.m4a",
+      "-f", "mp3", "-acodec", "libmp3lame", "-ab", "192k", "output.mp3",
+      // "-f", "ogg", "-acodec", "libopus", "-ab", "128k", "output.ogg",
     );
 
-    const outputBytes = await ffmpeg.readFile("output.m4a");
-    return new File([outputBytes], `${name}.m4a`, { type: "audio/mp4" });
+    const outputBytes = await ffmpeg.readFile("output.mp3");
+    // const outputBytes = await ffmpeg.readFile("output.ogg");
+    return new File([outputBytes], `${name}.mp3`, { type: "audio/mpeg" });
+    // return new File([outputBytes], `${name}.ogg`, { type: "audio/ogg" });
   } finally {
     await ffmpeg.unlink("input.0.pcm").catch(() => {});
     await ffmpeg.unlink("input.1.pcm").catch(() => {});
-    await ffmpeg.unlink("output.m4a").catch(() => {});
+    await ffmpeg.unlink("output.mp3").catch(() => {});
+    // await ffmpeg.unlink("output.ogg").catch(() => {});
     await ffmpeg.cleanup?.();
   }
 }

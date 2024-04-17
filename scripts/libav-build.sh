@@ -8,7 +8,7 @@ cd ./libav.js/configs
   "cli",
   "demuxer-pcm_f32le", "decoder-pcm_f32le",
   "filter-amerge", "filter-aresample",
-  "encoder-aac", "muxer-mp4"
+  "encoder-libmp3lame", "muxer-mp3"
 ]'
 
 cd ..
