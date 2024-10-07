@@ -29,7 +29,7 @@
       ></textarea>
     </div>
     <script type="module">
-      import * as pm from "./dist/punkomatic.browser.js";
+      import * as pm from "./punkomatic.browser.js";
 
       const songDataTextarea = document.getElementById("song-data-textarea");
       const convertButton = document.getElementById("convert-button");
@@ -43,16 +43,21 @@
           try {
             convertButton.disabled = true;
             document.querySelectorAll("button").forEach((el) => (el.disabled = true));
-            statusDiv.innerHTML = "";
-            const blob = await pm.renderSong({
-              songData: songDataTextarea.value,
-              sampleDir: "./data",
-              compress,
-              log: (text, progress) =>
-                (statusDiv.innerText = progress
-                  ? `${text} (${progress.current}/${progress.total})`
-                  : text),
+
+            statusDiv.innerText = "parsing song data...";
+            const song = pm.parseSong(songDataTextarea.value);
+
+            statusDiv.innerText = "rendering song...";
+            const audio = await pm.renderSong(song, {
+              baseSoundPath: "./data",
+              onprogress: (c, t) => {
+                statusDiv.innerText = `rendering... ${((100 * c) / t).toFixed(2)}% done`;
+              },
             });
+
+            statusDiv.innerText = "encoding song...";
+            const blob = await pm.encodeSong(song, audio, { compress });
+
             const url = URL.createObjectURL(blob);
             audioElement.src = url;
             statusDiv.innerHTML = `<a download href="${url}">Download</a>`;
