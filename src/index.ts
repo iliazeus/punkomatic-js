@@ -25,7 +25,6 @@ export interface Event {
   release: number;
 }
 
-/** @returns time-sorted Events with sample filenames, e.g. `"Bass/BassManualAA03.mp3"` */
 export function parseSong(data: string): Song {
   const match = data.match(/^\s*\(\s*(.*\s*)\)(.*?),(.*?),(.*?),(.*?)\s*$/);
   if (!match) throw new RangeError("invalid song data");
@@ -44,7 +43,9 @@ export function parseSong(data: string): Song {
     events: { drums: [], bass: [], guitarA: [], guitarB: [] },
   };
 
-  for (const [channel, data] of channels) {
+  for (let [channel, data] of channels) {
+    data = data.replace(/\s/g, '');
+
     let time = 0;
     let hasSound = false;
 
