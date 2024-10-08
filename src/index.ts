@@ -44,13 +44,16 @@ export function parseSong(data: string): Song {
   };
 
   for (let [channel, data] of channels) {
-    data = data.replace(/\s/g, '');
+    let events = song.events[channel];
+    data = data.replace(/\s/g, "");
 
     let time = 0;
     let hasSound = false;
 
     for (let i = 0; i < data.length; i += 2) {
-      if (hasSound && time >= song.events[channel].at(-1)!.endTime) hasSound = false;
+      if (hasSound && time >= events.at(-1)!.endTime + events.at(-1)!.release) {
+        hasSound = false;
+      }
 
       const atom = data.slice(i, i + 2);
 
@@ -59,16 +62,17 @@ export function parseSong(data: string): Song {
         time += length * 31129;
       } else if (atom === "!!") {
         if (hasSound) {
-          song.events[channel].at(-1)!.endTime = time;
-          song.events[channel].at(-1)!.release = 882;
+          events.at(-1)!.endTime = time;
+          events.at(-1)!.release = 882;
           hasSound = false;
         }
+        time += 31129;
       } else {
         const sound = SOUNDS[channel][parseBase52(atom)];
         if (hasSound) {
-          song.events[channel].at(-1)!.endTime = time;
-          song.events[channel].at(-1)!.release = 0;
-          song.events[channel].push({
+          events.at(-1)!.endTime = time;
+          events.at(-1)!.release = 0;
+          events.push({
             startTime: time,
             endTime: time + sound.samples,
             sound,
@@ -77,7 +81,7 @@ export function parseSong(data: string): Song {
           });
           time += 31129;
         } else {
-          song.events[channel].push({
+          events.push({
             startTime: time - (channel === "guitarB" ? 1700 : 1300),
             endTime: time + sound.samples - (channel === "guitarB" ? 1700 : 1300),
             sound,
