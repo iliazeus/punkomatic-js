@@ -4,6 +4,8 @@ declare global {
 
 import { Sound, SOUNDS } from "./sounds";
 import { initFfmpeg } from "./cross-ffmpeg";
+import { PoliteFetchClient } from "./polite-fetch";
+import { Pool } from "./pool";
 
 export interface Song {
   title: string;
@@ -145,6 +147,8 @@ export async function renderSong(
 
     if (!loadSoundData) {
       if (!baseSoundPath) throw new Error("no loadSoundData or baseSoundPath set");
+
+      let fetch = new PoliteFetchClient().fetch;
       loadSoundData = async (filename) => {
         const res = await fetch(baseSoundPath + "/" + filename);
         if (!res.ok) throw new Error(await res.text());
@@ -178,6 +182,22 @@ export async function renderSong(
     numberOfChannels: 2,
   });
 
+  let pool = new Pool();
+  const soundsByFilename = new Map<string, Promise<AudioBuffer>>();
+  for (const channel of Object.values(Channel)) {
+    for (const event of song.events[channel]) {
+      if (!soundsByFilename.has(event.sound.filename)) {
+        soundsByFilename.set(
+          event.sound.filename,
+          pool.push(async () => {
+            let data = await loadSoundData(event.sound.filename);
+            return await audioContext.decodeAudioData(data);
+          }),
+        );
+      }
+    }
+  }
+
   for (const channel of Object.values(Channel)) {
     const buffer = new wa.AudioBuffer({
       length: audioContext.length,
@@ -197,19 +217,12 @@ export async function renderSong(
 
     source.connect(gain).connect(panner).connect(audioContext.destination);
 
-    const samples = new Map<Sound, AudioBuffer>();
-
     const events = song.events[channel];
 
     for (const event of events) {
       onprogress?.(handledEventCount++, totalEventCount);
 
-      let soundBuffer = samples.get(event.sound);
-      if (!soundBuffer) {
-        const data = await loadSoundData(event.sound.filename);
-        soundBuffer = await audioContext.decodeAudioData(data);
-        samples.set(event.sound, soundBuffer);
-      }
+      let soundBuffer = await soundsByFilename.get(event.sound.filename)!;
 
       for (let c = 0; c < soundBuffer.numberOfChannels; c++) {
         let src = soundBuffer
