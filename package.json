@@ -5,7 +5,7 @@
     "node": "./dist/punkomatic.node.js",
     "browser": "./dist/punkomatic.browser.js"
   },
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "a tool to parse and render Punk-O-Matic 2 song data",
   "scripts": {
     "build": "./scripts/build.sh",

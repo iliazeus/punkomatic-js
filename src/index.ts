@@ -168,8 +168,7 @@ export async function renderSong(
 
     totalEventCount += events.length;
 
-    const channelSampleCount =
-      events.at(-1)!.endTime + events.at(-1)!.release - events.at(0)!.startTime;
+    const channelSampleCount = events.at(-1)!.endTime + events.at(-1)!.release;
     if (channelSampleCount > totalSampleCount) totalSampleCount = channelSampleCount;
 
     const channelStartOffset = events[0].startTime < 0 ? Math.abs(events[0].startTime) : 0;
@@ -177,7 +176,7 @@ export async function renderSong(
   }
 
   const audioContext = new wa.OfflineAudioContext({
-    length: totalSampleCount,
+    length: totalStartOffset + totalSampleCount,
     sampleRate: 44100,
     numberOfChannels: 2,
   });
@@ -232,7 +231,7 @@ export async function renderSong(
           .getChannelData(c)
           .subarray(
             totalStartOffset + event.startTime,
-            totalStartOffset + event.endTime + event.release,
+            totalStartOffset + event.startTime + src.length,
           );
 
         dst.set(src);
