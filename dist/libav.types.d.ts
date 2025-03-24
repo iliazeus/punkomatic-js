@@ -13,475 +13,580 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/**
- * Things in libav.js with Worker transfer characteristics.
- */
-export interface LibAVTransferable {
+declare namespace LibAV {
     /**
-     * The elements to pass as transfers when passing this object to/from
-     * workers.
+     * Things in libav.js with Worker transfer characteristics.
      */
-    libavjsTransfer?: Transferable[];
-}
-
-/**
- * Frames, as taken/given by libav.js.
- */
-export interface Frame extends LibAVTransferable {
-    /**
-     * The actual frame data. For non-planar audio data, this is a typed array.
-     * For planar audio data, this is an array of typed arrays, one per plane.
-     * For video data, this is a single Uint8Array, and its layout is described
-     * by the layout field.
-     */
-    data: any;
+    export interface LibAVTransferable {
+        /**
+         * The elements to pass as transfers when passing this object to/from
+         * workers.
+         */
+        libavjsTransfer?: Transferable[];
+    }
 
     /**
-     * Sample format or pixel format.
+     * Frames, as taken/given by libav.js.
      */
-    format: number;
+    export interface Frame extends LibAVTransferable {
+        /**
+         * The actual frame data. For non-planar audio data, this is a typed array.
+         * For planar audio data, this is an array of typed arrays, one per plane.
+         * For video data, this is a single Uint8Array, and its layout is described
+         * by the layout field.
+         */
+        data: any;
+
+        /**
+         * Sample format or pixel format.
+         */
+        format: number;
+
+        /**
+         * Video only. Layout of each plane within the data array. `offset` is the
+         * base offset of the plane, and `stride` is what libav calls `linesize`.
+         * This layout format is from WebCodecs.
+         */
+        layout?: {offset: number, stride: number}[];
+
+        /**
+         * Presentation timestamp for this frame. Units depends on surrounding
+         * context. Will always be set by libav.js, but libav.js will accept frames
+         * from outside that do not have this set.
+         */
+        pts?: number, ptshi?: number;
+
+        /**
+         * Base for timestamps of this frame.
+         */
+        time_base_num?: number, time_base_den?: number;
+
+        /**
+         * Audio only. Channel layout. It is possible for only one of this and
+         * channels to be set.
+         */
+        channel_layout?: number;
+
+        /**
+         * Audio only. Number of channels. It is possible for only one of this and
+         * channel_layout to be set.
+         */
+        channels?: number;
+
+        /**
+         * Audio only. Number of samples in the frame.
+         */
+        nb_samples?: number;
+
+        /**
+         * Audio only. Sample rate.
+         */
+        sample_rate?: number;
+
+        /**
+         * Video only. Width of frame.
+         */
+        width?: number;
+
+        /**
+         * Video only. Height of frame.
+         */
+        height?: number;
+
+        /**
+         * Video only. Cropping rectangle of the frame.
+         */
+        crop?: {top: number, bottom: number, left: number, right: number};
+
+        /**
+         * Video only. Sample aspect ratio (pixel aspect ratio), as a numerator and
+         * denominator. 0 is interpreted as 1 (square pixels).
+         */
+        sample_aspect_ratio?: [number, number];
+
+        /**
+         * Is this a keyframe? (1=yes, 0=maybe)
+         */
+        key_frame?: number;
+
+        /**
+         * Picture type (libav-specific value)
+         */
+        pict_type?: number;
+    }
 
     /**
-     * Video only. Layout of each plane within the data array. `offset` is the
-     * base offset of the plane, and `stride` is what libav calls `linesize`.
-     * This layout format is from WebCodecs.
+     * Packets, as taken/given by libav.js.
      */
-    layout?: {offset: number, stride: number}[];
+    export interface Packet extends LibAVTransferable {
+        /**
+         * The actual data represented by this packet.
+         */
+        data: Uint8Array;
+
+        /**
+         * Presentation timestamp.
+         */
+        pts?: number, ptshi?: number;
+
+        /**
+         * Decoding timestamp.
+         */
+        dts?: number, dtshi?: number;
+
+        /**
+         * Base for timestamps of this packet.
+         */
+        time_base_num?: number, time_base_den?: number;
+
+        /**
+         * Index of this stream within a surrounding muxer/demuxer.
+         */
+        stream_index?: number;
+
+        /**
+         * Packet flags, as defined by ffmpeg.
+         */
+        flags?: number;
+
+        /**
+         * Duration of this packet. Rarely used.
+         */
+        duration?: number, durationhi?: number;
+
+        /**
+         * Side data. Codec-specific.
+         */
+        side_data?: any;
+    }
 
     /**
-     * Presentation timestamp for this frame. Units depends on surrounding
-     * context. Will always be set by libav.js, but libav.js will accept frames
-     * from outside that do not have this set.
+     * Stream information, as returned by ff_init_demuxer_file.
      */
-    pts?: number, ptshi?: number;
+    export interface Stream {
+        /**
+         * Pointer to the underlying AVStream.
+         */
+        ptr: number;
+
+        /**
+         * Index of this stream.
+         */
+        index: number;
+
+        /**
+         * Codec parameters.
+         */
+        codecpar: number;
+
+        /**
+         * Type of codec (audio or video, typically)
+         */
+        codec_type: number;
+
+        /**
+         * Codec identifier.
+         */
+        codec_id: number;
+
+        /**
+         * Base for timestamps of packets in this stream.
+         */
+        time_base_num: number, time_base_den: number;
+
+        /**
+         * Duration of this stream in time_base units.
+         */
+        duration_time_base: number;
+
+        /**
+         * Duration of this stream in seconds.
+         */
+        duration: number;
+    }
 
     /**
-     * Audio only. Channel layout. It is possible for only one of this and
-     * channels to be set.
+     * Codec parameters, if copied out.
      */
-    channel_layout?: number;
+    export interface CodecParameters {
+        /**
+         * General type of the encoded data.
+         */
+        codec_type: number;
+
+        /**
+         * Specific type of the encoded data (the codec used).
+         */
+        codec_id: number;
+
+        /**
+         * Additional information about the codec (corresponds to the AVI FOURCC).
+         */
+        codec_tag?: number;
+
+        /**
+         * Extra binary data needed for initializing the decoder, codec-dependent.
+         *
+         * Must be allocated with av_malloc() and will be freed by
+         * avcodec_parameters_free(). The allocated size of extradata must be at
+         * least extradata_size + AV_INPUT_BUFFER_PADDING_SIZE, with the padding
+         * bytes zeroed.
+         */
+        extradata?: Uint8Array;
+
+        /**
+         * - video: the pixel format, the value corresponds to enum AVPixelFormat.
+         * - audio: the sample format, the value corresponds to enum AVSampleFormat.
+         */
+        format: number;
+
+        /**
+         * Bitrate. Not always set.
+         */
+        bit_rate?: number;
+        bit_ratehi?: number;
+
+        /**
+         * Codec-specific bitstream restrictions that the stream conforms to.
+         */
+        profile?: number;
+        level?: number;
+
+        /**
+         * Video only. The dimensions of the video frame in pixels.
+         */
+        width?: number;
+        height?: number;
+
+        /**
+         * Video only. Additional colorspace characteristics.
+         */
+        color_range?: number;
+        color_primaries?: number;
+        color_trc?: number;
+        color_space?: number;
+        chroma_location?: number;
+
+        /**
+         * Audio only. The number of audio samples per second.
+         */
+        sample_rate?: number;
+
+        /**
+         * Audio only. The channel layout and number of channels.
+         */
+        channel_layoutmask?: number;
+        channels?: number;
+    }
 
     /**
-     * Audio only. Number of channels. It is possible for only one of this and
-     * channel_layout to be set.
+     * Settings used to set up a filter.
      */
-    channels?: number;
+    export interface FilterIOSettings {
+        /**
+         * Type of filterchain, as an AVMEDIA_TYPE_*. If unset, defaults to
+         * AVMEDIA_TYPE_AUDIO.
+         */
+        type?: number;
+
+        /**
+         * The timebase for this filterchain. If unset, [1, frame_rate] or [1,
+         * sample_rate] will be used.
+         */
+        time_base?: [number, number];
+
+        /**
+         * Video only. Framerate of the input.
+         */
+        frame_rate?: number;
+
+        /**
+         * Audio only. Sample rate of the input.
+         */
+        sample_rate?: number;
+
+        /**
+         * Video only. Pixel format of the input.
+         */
+        pix_fmt?: number;
+
+        /**
+         * Audio only. Sample format of the input.
+         */
+        sample_fmt?: number;
+
+        /**
+         * Video only. Width of the input.
+         */
+        width?: number;
+
+        /**
+         * Video only. Height of the input.
+         */
+        height?: number;
+
+        /**
+         * Audio only. Channel layout of the input. Note that there is no
+         * "channels"; you must describe a layout.
+         */
+        channel_layout?: number;
+
+        /**
+         * Audio only, output only, optional. Size of an audio frame.
+         */
+        frame_size?: number;
+    }
 
     /**
-     * Audio only. Number of samples in the frame.
+     * Supported properties of an AVCodecContext, used by ff_init_encoder.
      */
-    nb_samples?: number;
+    export interface AVCodecContextProps {
+        bit_rate?: number;
+        bit_ratehi?: number;
+        channel_layout?: number;
+        channel_layouthi?: number;
+        channels?: number;
+        frame_size?: number;
+        framerate_num?: number;
+        framerate_den?: number;
+        gop_size?: number;
+        height?: number;
+        keyint_min?: number;
+        level?: number;
+        pix_fmt?: number;
+        profile?: number;
+        rc_max_rate?: number;
+        rc_max_ratehi?: number;
+        rc_min_rate?: number;
+        rc_min_ratehi?: number;
+        sample_aspect_ratio_num?: number;
+        sample_aspect_ratio_den?: number;
+        sample_fmt?: number;
+        sample_rate?: number;
+        qmax?: number;
+        qmin?: number;
+        width?: number;
+    }
 
     /**
-     * Audio only. Sample rate.
+     * Static properties that are accessible both on the LibAV wrapper and on each
+     * libav instance.
      */
-    sample_rate?: number;
+    export interface LibAVStatic {
+        /**
+         * Convert a pair of 32-bit integers representing a single 64-bit integer
+         * into a 64-bit float. 64-bit floats are only sufficient for 53 bits of
+         * precision, so for very large values, this is lossy.
+         * @param lo  Low bits of the pair
+         * @param hi  High bits of the pair
+         */
+        i64tof64(lo: number, hi: number): number;
+
+        /**
+         * Convert a 64-bit floating-point number into a pair of 32-bit integers
+         * representing a single 64-bit integer. The 64-bit float must actually
+         * contain an integer value for this result to be accurate.
+         * @param val  Floating-point value to convert
+         * @returns [low bits, high bits]
+         */
+        f64toi64(val: number): [number, number];
+
+        /**
+         * Convert a pair of 32-bit integers representing a single 64-bit integer
+         * into a BigInt. Requires BigInt support, of course.
+         * @param lo  Low bits of the pair
+         * @param hi  High bits of the pair
+         */
+        i64ToBigInt(lo: number, hi: number): BigInt;
+
+        /**
+         * Convert a (64-bit) BigInt into a pair of 32-bit integers. Requires BigInt
+         * support, of course.
+         * @param val  BigInt value to convert
+         * @returns [low bits, high bits]
+         */
+        bigIntToi64(val: BigInt): [number, number];
+
+        /**
+         * Extract the channel layout from a frame (or any other source of
+         * channel layout). Unifies the various ways that channel layouts may
+         * be stored.
+         */
+        ff_channel_layout(frame: {
+            channel_layout?: number,
+            channels?: number
+        }): number;
+
+        /**
+         * Extract the channel count from a frame (or any other source of
+         * channel layout). Unifies the various ways that channel layouts may be
+         * stored.
+         */
+        ff_channels(frame: {
+            channel_layout?: number,
+            channels?: number
+        }): number;
+
+        // Enumerations:
+        AV_OPT_SEARCH_CHILDREN: number;
+        AVMEDIA_TYPE_UNKNOWN: number;
+        AVMEDIA_TYPE_VIDEO: number;
+        AVMEDIA_TYPE_AUDIO: number;
+        AVMEDIA_TYPE_DATA: number;
+        AVMEDIA_TYPE_SUBTITLE: number;
+        AVMEDIA_TYPE_ATTACHMENT: number;
+        AV_SAMPLE_FMT_NONE: number;
+        AV_SAMPLE_FMT_U8: number;
+        AV_SAMPLE_FMT_S16: number;
+        AV_SAMPLE_FMT_S32: number;
+        AV_SAMPLE_FMT_FLT: number;
+        AV_SAMPLE_FMT_DBL: number;
+        AV_SAMPLE_FMT_U8P: number;
+        AV_SAMPLE_FMT_S16P: number;
+        AV_SAMPLE_FMT_S32P: number;
+        AV_SAMPLE_FMT_FLTP: number;
+        AV_SAMPLE_FMT_DBLP: number;
+        AV_SAMPLE_FMT_S64: number;
+        AV_SAMPLE_FMT_S64P: number;
+        AV_SAMPLE_FMT_NB: number;
+        AV_PIX_FMT_NONE: number;
+        AV_PIX_FMT_YUV420P: number;
+        AV_PIX_FMT_YUYV422: number;
+        AV_PIX_FMT_RGB24: number;
+        AV_PIX_FMT_BGR24: number;
+        AV_PIX_FMT_YUV422P: number;
+        AV_PIX_FMT_YUV444P: number;
+        AV_PIX_FMT_YUV410P: number;
+        AV_PIX_FMT_YUV411P: number;
+        AV_PIX_FMT_GRAY8: number;
+        AV_PIX_FMT_MONOWHITE: number;
+        AV_PIX_FMT_MONOBLACK: number;
+        AV_PIX_FMT_PAL8: number;
+        AV_PIX_FMT_YUVJ420P: number;
+        AV_PIX_FMT_YUVJ422P: number;
+        AV_PIX_FMT_YUVJ444P: number;
+        AV_PIX_FMT_UYVY422: number;
+        AV_PIX_FMT_UYYVYY411: number;
+        AV_PIX_FMT_BGR8: number;
+        AV_PIX_FMT_BGR4: number;
+        AV_PIX_FMT_BGR4_BYTE: number;
+        AV_PIX_FMT_RGB8: number;
+        AV_PIX_FMT_RGB4: number;
+        AV_PIX_FMT_RGB4_BYTE: number;
+        AV_PIX_FMT_NV12: number;
+        AV_PIX_FMT_NV21: number;
+        AV_PIX_FMT_ARGB: number;
+        AV_PIX_FMT_RGBA: number;
+        AV_PIX_FMT_ABGR: number;
+        AV_PIX_FMT_BGRA: number;
+        AV_PIX_FMT_GRAY16BE: number;
+        AV_PIX_FMT_GRAY16LE: number;
+        AV_PIX_FMT_YUV440P: number;
+        AV_PIX_FMT_YUVJ440P: number;
+        AV_PIX_FMT_YUVA420P: number;
+        AV_PIX_FMT_RGB48BE: number;
+        AV_PIX_FMT_RGB48LE: number;
+        AV_PIX_FMT_RGB565BE: number;
+        AV_PIX_FMT_RGB565LE: number;
+        AV_PIX_FMT_RGB555BE: number;
+        AV_PIX_FMT_RGB555LE: number;
+        AV_PIX_FMT_BGR565BE: number;
+        AV_PIX_FMT_BGR565LE: number;
+        AV_PIX_FMT_BGR555BE: number;
+        AV_PIX_FMT_BGR555LE: number;
+        AVIO_FLAG_READ: number;
+        AVIO_FLAG_WRITE: number;
+        AVIO_FLAG_READ_WRITE: number;
+        AVIO_FLAG_NONBLOCK: number;
+        AVIO_FLAG_DIRECT: number;
+        AVSEEK_FLAG_BACKWARD: number;
+        AVSEEK_FLAG_BYTE: number;
+        AVSEEK_FLAG_ANY: number;
+        AVSEEK_FLAG_FRAME: number;
+        AVDISCARD_NONE: number;
+        AVDISCARD_DEFAULT: number;
+        AVDISCARD_NONREF: number;
+        AVDISCARD_BIDIR: number;
+        AVDISCARD_NONINTRA: number;
+        AVDISCARD_NONKEY: number;
+        AVDISCARD_ALL: number;
+        AV_LOG_QUIET: number;
+        AV_LOG_PANIC: number;
+        AV_LOG_FATAL: number;
+        AV_LOG_ERROR: number;
+        AV_LOG_WARNING: number;
+        AV_LOG_INFO: number;
+        AV_LOG_VERBOSE: number;
+        AV_LOG_DEBUG: number;
+        AV_LOG_TRACE: number;
+        AV_PKT_FLAG_KEY: number;
+        AV_PKT_FLAG_CORRUPT: number;
+        AV_PKT_FLAG_DISCARD: number;
+        AV_PKT_FLAG_TRUSTED: number;
+        AV_PKT_FLAG_DISPOSABLE: number;
+        E2BIG: number;
+        EPERM: number;
+        EADDRINUSE: number;
+        EADDRNOTAVAIL: number;
+        EAFNOSUPPORT: number;
+        EAGAIN: number;
+        EALREADY: number;
+        EBADF: number;
+        EBADMSG: number;
+        EBUSY: number;
+        ECANCELED: number;
+        ECHILD: number;
+        ECONNABORTED: number;
+        ECONNREFUSED: number;
+        ECONNRESET: number;
+        EDEADLOCK: number;
+        EDESTADDRREQ: number;
+        EDOM: number;
+        EDQUOT: number;
+        EEXIST: number;
+        EFAULT: number;
+        EFBIG: number;
+        EHOSTUNREACH: number;
+        EIDRM: number;
+        EILSEQ: number;
+        EINPROGRESS: number;
+        EINTR: number;
+        EINVAL: number;
+        EIO: number;
+        EISCONN: number;
+        EISDIR: number;
+        ELOOP: number;
+        EMFILE: number;
+        EMLINK: number;
+        EMSGSIZE: number;
+        EMULTIHOP: number;
+        ENAMETOOLONG: number;
+        ENETDOWN: number;
+        ENETRESET: number;
+        ENETUNREACH: number;
+        ENFILE: number;
+        ENOBUFS: number;
+        ENODEV: number;
+        ENOENT: number;
+        AVERROR_EOF: number;
+    }
 
     /**
-     * Video only. Width of frame.
+     * A LibAV instance, created by LibAV.LibAV (*not* the LibAV wrapper itself)
      */
-    width?: number;
+    export interface LibAV extends LibAVStatic {
+        /**
+         * The operating mode of this libav.js instance. Each operating mode has
+         * different constraints.
+         */
+        libavjsMode: "direct" | "worker" | "threads";
+
+        /**
+         * If the operating mode is "worker", the worker itself.
+         */
+        worker?: Worker;
 
     /**
-     * Video only. Height of frame.
-     */
-    height?: number;
-
-    /**
-     * Video only. Cropping rectangle of the frame.
-     */
-    crop?: {top: number, bottom: number, left: number, right: number};
-
-    /**
-     * Video only. Sample aspect ratio (pixel aspect ratio), as a numerator and
-     * denominator. 0 is interpreted as 1 (square pixels).
-     */
-    sample_aspect_ratio?: [number, number];
-
-    /**
-     * Is this a keyframe? (1=yes, 0=maybe)
-     */
-    key_frame?: number;
-
-    /**
-     * Picture type (libav-specific value)
-     */
-    pict_type?: number;
-}
-
-/**
- * Packets, as taken/given by libav.js.
- */
-export interface Packet extends LibAVTransferable {
-    /**
-     * The actual data represented by this packet.
-     */
-    data: Uint8Array;
-
-    /**
-     * Presentation timestamp.
-     */
-    pts?: number, ptshi?: number;
-
-    /**
-     * Decoding timestamp.
-     */
-    dts?: number, dtshi?: number;
-
-    /**
-     * Index of this stream within a surrounding muxer/demuxer.
-     */
-    stream_index?: number;
-
-    /**
-     * Packet flags, as defined by ffmpeg.
-     */
-    flags?: number;
-
-    /**
-     * Duration of this packet. Rarely used.
-     */
-    duration?: number, durationhi?: number;
-
-    /**
-     * Side data. Codec-specific.
-     */
-    side_data?: any;
-}
-
-/**
- * Stream information, as returned by ff_init_demuxer_file.
- */
-export interface Stream {
-    /**
-     * Pointer to the underlying AVStream.
-     */
-    ptr: number;
-
-    /**
-     * Index of this stream.
-     */
-    index: number;
-
-    /**
-     * Codec parameters.
-     */
-    codecpar: number;
-
-    /**
-     * Type of codec (audio or video, typically)
-     */
-    codec_type: number;
-
-    /**
-     * Codec identifier.
-     */
-    codec_id: number;
-
-    /**
-     * Base for timestamps of packets in this stream.
-     */
-    time_base_num: number, time_base_den: number;
-
-    /**
-     * Duration of this stream in time_base units.
-     */
-    duration_time_base: number;
-
-    /**
-     * Duration of this stream in seconds.
-     */
-    duration: number;
-}
-
-/**
- * Settings used to set up a filter.
- */
-export interface FilterIOSettings {
-    /**
-     * Type of filterchain, as an AVMEDIA_TYPE_*. If unset, defaults to
-     * AVMEDIA_TYPE_AUDIO.
-     */
-    type?: number;
-
-    /**
-     * The timebase for this filterchain. If unset, [1, frame_rate] or [1,
-     * sample_rate] will be used.
-     */
-    time_base?: [number, number];
-
-    /**
-     * Video only. Framerate of the input.
-     */
-    frame_rate?: number;
-
-    /**
-     * Audio only. Sample rate of the input.
-     */
-    sample_rate?: number;
-
-    /**
-     * Video only. Pixel format of the input.
-     */
-    pix_fmt?: number;
-
-    /**
-     * Audio only. Sample format of the input.
-     */
-    sample_fmt?: number;
-
-    /**
-     * Video only. Width of the input.
-     */
-    width?: number;
-
-    /**
-     * Video only. Height of the input.
-     */
-    height?: number;
-
-    /**
-     * Audio only. Channel layout of the input. Note that there is no
-     * "channels"; you must describe a layout.
-     */
-    channel_layout?: number;
-
-    /**
-     * Audio only, output only, optional. Size of an audio frame.
-     */
-    frame_size?: number;
-}
-
-/**
- * Supported properties of an AVCodecContext, used by ff_init_encoder.
- */
-export interface AVCodecContextProps {
-    bit_rate?: number;
-    bit_ratehi?: number;
-    channel_layout?: number;
-    channel_layouthi?: number;
-    channels?: number;
-    frame_size?: number;
-    framerate_num?: number;
-    framerate_den?: number;
-    gop_size?: number;
-    height?: number;
-    keyint_min?: number;
-    level?: number;
-    pix_fmt?: number;
-    profile?: number;
-    rc_max_rate?: number;
-    rc_max_ratehi?: number;
-    rc_min_rate?: number;
-    rc_min_ratehi?: number;
-    sample_aspect_ratio_num?: number;
-    sample_aspect_ratio_den?: number;
-    sample_fmt?: number;
-    sample_rate?: number;
-    qmax?: number;
-    qmin?: number;
-    width?: number;
-}
-
-/**
- * Static properties that are accessible both on the LibAV wrapper and on each
- * libav instance.
- */
-export interface LibAVStatic {
-    /**
-     * Convert a pair of 32-bit integers representing a single 64-bit integer
-     * into a 64-bit float. 64-bit floats are only sufficient for 53 bits of
-     * precision, so for very large values, this is lossy.
-     * @param lo  Low bits of the pair
-     * @param hi  High bits of the pair
-     */
-    i64tof64(lo: number, hi: number): number;
-
-    /**
-     * Convert a 64-bit floating-point number into a pair of 32-bit integers
-     * representing a single 64-bit integer. The 64-bit float must actually
-     * contain an integer value for this result to be accurate.
-     * @param val  Floating-point value to convert
-     * @returns [low bits, high bits]
-     */
-    f64toi64(val: number): [number, number];
-
-    /**
-     * Convert a pair of 32-bit integers representing a single 64-bit integer
-     * into a BigInt. Requires BigInt support, of course.
-     * @param lo  Low bits of the pair
-     * @param hi  High bits of the pair
-     */
-    i64ToBigInt(lo: number, hi: number): BigInteger;
-
-    /**
-     * Convert a (64-bit) BigInt into a pair of 32-bit integers. Requires BigInt
-     * support, of course.
-     * @param val  BigInt value to convert
-     * @returns [low bits, high bits]
-     */
-    bigIntToi64(val: BigInteger): [number, number];
-
-    // Enumerations:
-    AV_OPT_SEARCH_CHILDREN: number;
-    AVMEDIA_TYPE_UNKNOWN: number;
-    AVMEDIA_TYPE_VIDEO: number;
-    AVMEDIA_TYPE_AUDIO: number;
-    AVMEDIA_TYPE_DATA: number;
-    AVMEDIA_TYPE_SUBTITLE: number;
-    AVMEDIA_TYPE_ATTACHMENT: number;
-    AV_SAMPLE_FMT_NONE: number;
-    AV_SAMPLE_FMT_U8: number;
-    AV_SAMPLE_FMT_S16: number;
-    AV_SAMPLE_FMT_S32: number;
-    AV_SAMPLE_FMT_FLT: number;
-    AV_SAMPLE_FMT_DBL: number;
-    AV_SAMPLE_FMT_U8P: number;
-    AV_SAMPLE_FMT_S16P: number;
-    AV_SAMPLE_FMT_S32P: number;
-    AV_SAMPLE_FMT_FLTP: number;
-    AV_SAMPLE_FMT_DBLP: number;
-    AV_SAMPLE_FMT_S64: number;
-    AV_SAMPLE_FMT_S64P: number;
-    AV_SAMPLE_FMT_NB: number;
-    AV_PIX_FMT_NONE: number;
-    AV_PIX_FMT_YUV420P: number;
-    AV_PIX_FMT_YUYV422: number;
-    AV_PIX_FMT_RGB24: number;
-    AV_PIX_FMT_BGR24: number;
-    AV_PIX_FMT_YUV422P: number;
-    AV_PIX_FMT_YUV444P: number;
-    AV_PIX_FMT_YUV410P: number;
-    AV_PIX_FMT_YUV411P: number;
-    AV_PIX_FMT_GRAY8: number;
-    AV_PIX_FMT_MONOWHITE: number;
-    AV_PIX_FMT_MONOBLACK: number;
-    AV_PIX_FMT_PAL8: number;
-    AV_PIX_FMT_YUVJ420P: number;
-    AV_PIX_FMT_YUVJ422P: number;
-    AV_PIX_FMT_YUVJ444P: number;
-    AV_PIX_FMT_UYVY422: number;
-    AV_PIX_FMT_UYYVYY411: number;
-    AV_PIX_FMT_BGR8: number;
-    AV_PIX_FMT_BGR4: number;
-    AV_PIX_FMT_BGR4_BYTE: number;
-    AV_PIX_FMT_RGB8: number;
-    AV_PIX_FMT_RGB4: number;
-    AV_PIX_FMT_RGB4_BYTE: number;
-    AV_PIX_FMT_NV12: number;
-    AV_PIX_FMT_NV21: number;
-    AV_PIX_FMT_ARGB: number;
-    AV_PIX_FMT_RGBA: number;
-    AV_PIX_FMT_ABGR: number;
-    AV_PIX_FMT_BGRA: number;
-    AV_PIX_FMT_GRAY16BE: number;
-    AV_PIX_FMT_GRAY16LE: number;
-    AV_PIX_FMT_YUV440P: number;
-    AV_PIX_FMT_YUVJ440P: number;
-    AV_PIX_FMT_YUVA420P: number;
-    AV_PIX_FMT_RGB48BE: number;
-    AV_PIX_FMT_RGB48LE: number;
-    AV_PIX_FMT_RGB565BE: number;
-    AV_PIX_FMT_RGB565LE: number;
-    AV_PIX_FMT_RGB555BE: number;
-    AV_PIX_FMT_RGB555LE: number;
-    AV_PIX_FMT_BGR565BE: number;
-    AV_PIX_FMT_BGR565LE: number;
-    AV_PIX_FMT_BGR555BE: number;
-    AV_PIX_FMT_BGR555LE: number;
-    AVIO_FLAG_READ: number;
-    AVIO_FLAG_WRITE: number;
-    AVIO_FLAG_READ_WRITE: number;
-    AVIO_FLAG_NONBLOCK: number;
-    AVIO_FLAG_DIRECT: number;
-    AVSEEK_FLAG_BACKWARD: number;
-    AVSEEK_FLAG_BYTE: number;
-    AVSEEK_FLAG_ANY: number;
-    AVSEEK_FLAG_FRAME: number;
-    AVDISCARD_NONE: number;
-    AVDISCARD_DEFAULT: number;
-    AVDISCARD_NONREF: number;
-    AVDISCARD_BIDIR: number;
-    AVDISCARD_NONINTRA: number;
-    AVDISCARD_NONKEY: number;
-    AVDISCARD_ALL: number;
-    AV_LOG_QUIET: number;
-    AV_LOG_PANIC: number;
-    AV_LOG_FATAL: number;
-    AV_LOG_ERROR: number;
-    AV_LOG_WARNING: number;
-    AV_LOG_INFO: number;
-    AV_LOG_VERBOSE: number;
-    AV_LOG_DEBUG: number;
-    AV_LOG_TRACE: number;
-    AV_PKT_FLAG_KEY: number;
-    AV_PKT_FLAG_CORRUPT: number;
-    AV_PKT_FLAG_DISCARD: number;
-    AV_PKT_FLAG_TRUSTED: number;
-    AV_PKT_FLAG_DISPOSABLE: number;
-    E2BIG: number;
-    EPERM: number;
-    EADDRINUSE: number;
-    EADDRNOTAVAIL: number;
-    EAFNOSUPPORT: number;
-    EAGAIN: number;
-    EALREADY: number;
-    EBADF: number;
-    EBADMSG: number;
-    EBUSY: number;
-    ECANCELED: number;
-    ECHILD: number;
-    ECONNABORTED: number;
-    ECONNREFUSED: number;
-    ECONNRESET: number;
-    EDEADLOCK: number;
-    EDESTADDRREQ: number;
-    EDOM: number;
-    EDQUOT: number;
-    EEXIST: number;
-    EFAULT: number;
-    EFBIG: number;
-    EHOSTUNREACH: number;
-    EIDRM: number;
-    EILSEQ: number;
-    EINPROGRESS: number;
-    EINTR: number;
-    EINVAL: number;
-    EIO: number;
-    EISCONN: number;
-    EISDIR: number;
-    ELOOP: number;
-    EMFILE: number;
-    EMLINK: number;
-    EMSGSIZE: number;
-    EMULTIHOP: number;
-    ENAMETOOLONG: number;
-    ENETDOWN: number;
-    ENETRESET: number;
-    ENETUNREACH: number;
-    ENFILE: number;
-    ENOBUFS: number;
-    ENODEV: number;
-    ENOENT: number;
-    AVERROR_EOF: number;
-}
-
-/**
- * A LibAV instance, created by LibAV.LibAV (*not* the LibAV wrapper itself)
- */
-export interface LibAV extends LibAVStatic {
-    /**
-     * The operating mode of this libav.js instance. Each operating mode has
-     * different constraints.
-     */
-    libavjsMode: "direct" | "worker" | "threads";
-
-    /**
-     * If the operating mode is "worker", the worker itself.
-     */
-    worker?: Worker;
-
-/**
  * Return number of bytes per sample.
  *
  * @param sample_fmt the sample format
@@ -617,6 +722,7 @@ av_frame_ref(dst: number,src: number): Promise<number>;
  * Unreference all the buffers referenced by frame and reset the frame fields.
  */
 av_frame_unref(frame: number): Promise<void>;
+ff_frame_rescale_ts_js(a0: number,a1: number,a2: number,a3: number,a4: number): Promise<void>;
 /**
  * Get the current log level
  *
@@ -736,6 +842,8 @@ av_strdup(s: string): Promise<number>;
  *         - A different negative AVERROR code in other failure cases.
  */
 av_buffersink_get_frame(ctx: number,frame: number): Promise<number>;
+av_buffersink_get_time_base_num(a0: number): Promise<number>;
+av_buffersink_get_time_base_den(a0: number): Promise<number>;
 /**
  * Set the frame size for an audio buffer sink.
  *
@@ -744,6 +852,7 @@ av_buffersink_get_frame(ctx: number,frame: number): Promise<number>;
  * not enough. The last buffer at EOF will be padded with 0.
  */
 av_buffersink_set_frame_size(ctx: number,frame_size: number): Promise<void>;
+ff_buffersink_set_ch_layout(a0: number,a1: number,a2: number): Promise<number>;
 /**
  * Add a frame to the buffer source.
  *
@@ -870,7 +979,7 @@ avcodec_alloc_context3(codec: number): Promise<number>;
  * the codec-specific data allocated in avcodec_alloc_context3() with a non-NULL
  * codec. Subsequent calls will do nothing.
  *
- * @note Do not use this function. Use avcodec_free_context() to destroy a
+ * @deprecated Do not use this function. Use avcodec_free_context() to destroy a
  * codec context (either open or closed). Opening and closing a codec context
  * multiple times is not supported anymore -- use multiple codec contexts
  * instead.
@@ -922,6 +1031,21 @@ avcodec_find_encoder(id: number): Promise<number>;
  */
 avcodec_find_encoder_by_name(name: string): Promise<number>;
 /**
+ * Reset the internal codec state / flush internal buffers. Should be called
+ * e.g. when seeking or when switching to a different stream.
+ *
+ * @note for decoders, this function just releases any references the decoder
+ * might keep internally, but the caller's references remain valid.
+ *
+ * @note for encoders, this function will only do something if the encoder
+ * declares support for AV_CODEC_CAP_ENCODER_FLUSH. When called, the encoder
+ * will drain any remaining packets, and can then be re-used for a different
+ * stream (as opposed to sending a null frame which will leave the encoder
+ * in a permanent EOF state after draining). This can be desirable if the
+ * cost of tearing down and replacing the encoder instance is high.
+ */
+avcodec_flush_buffers(avctx: number): Promise<void>;
+/**
  * Free the codec context and everything associated with it and write NULL to
  * the provided pointer.
  */
@@ -939,9 +1063,16 @@ avcodec_get_name(id: number): Promise<string>;
  * avcodec_find_decoder() and avcodec_find_encoder() provide an easy way for
  * retrieving a codec.
  *
- * @note Always call this function before using decoding routines (such as
- * @ref avcodec_receive_frame()).
+ * Depending on the codec, you might need to set options in the codec context
+ * also for decoding (e.g. width, height, or the pixel or audio sample format in
+ * the case the information is not available in the bitstream, as when decoding
+ * raw audio or video).
  *
+ * Options in the codec context can be set either by setting them in the options
+ * AVDictionary, or by setting the values in the context itself, directly or by
+ * using the av_opt_set() API before calling this function.
+ *
+ * Example:
  * @code
  * av_dict_set(&opts, "b", "2.5M", 0);
  * codec = avcodec_find_decoder(AV_CODEC_ID_H264);
@@ -954,17 +1085,36 @@ avcodec_get_name(id: number): Promise<string>;
  *     exit(1);
  * @endcode
  *
+ * In the case AVCodecParameters are available (e.g. when demuxing a stream
+ * using libavformat, and accessing the AVStream contained in the demuxer), the
+ * codec parameters can be copied to the codec context using
+ * avcodec_parameters_to_context(), as in the following example:
+ *
+ * @code
+ * AVStream *stream = ...;
+ * context = avcodec_alloc_context3(codec);
+ * if (avcodec_parameters_to_context(context, stream->codecpar) < 0)
+ *     exit(1);
+ * if (avcodec_open2(context, codec, NULL) < 0)
+ *     exit(1);
+ * @endcode
+ *
+ * @note Always call this function before using decoding routines (such as
+ * @ref avcodec_receive_frame()).
+ *
  * @param avctx The context to initialize.
  * @param codec The codec to open this context for. If a non-NULL codec has been
  *              previously passed to avcodec_alloc_context3() or
  *              for this context, then this parameter MUST be either NULL or
  *              equal to the previously passed codec.
- * @param options A dictionary filled with AVCodecContext and codec-private options.
- *                On return this object will be filled with options that were not found.
+ * @param options A dictionary filled with AVCodecContext and codec-private
+ *                options, which are set on top of the options already set in
+ *                avctx, can be NULL. On return this object will be filled with
+ *                options that were not found in the avctx codec context.
  *
  * @return zero on success, a negative value on error
  * @see avcodec_alloc_context3(), avcodec_find_decoder(), avcodec_find_encoder(),
- *      av_dict_set(), av_opt_find().
+ *      av_dict_set(), av_opt_set(), av_opt_find(), avcodec_parameters_to_context()
  */
 avcodec_open2(avctx: number,codec: number,options: number): Promise<number>;
 /**
@@ -975,9 +1125,16 @@ avcodec_open2(avctx: number,codec: number,options: number): Promise<number>;
  * avcodec_find_decoder() and avcodec_find_encoder() provide an easy way for
  * retrieving a codec.
  *
- * @note Always call this function before using decoding routines (such as
- * @ref avcodec_receive_frame()).
+ * Depending on the codec, you might need to set options in the codec context
+ * also for decoding (e.g. width, height, or the pixel or audio sample format in
+ * the case the information is not available in the bitstream, as when decoding
+ * raw audio or video).
  *
+ * Options in the codec context can be set either by setting them in the options
+ * AVDictionary, or by setting the values in the context itself, directly or by
+ * using the av_opt_set() API before calling this function.
+ *
+ * Example:
  * @code
  * av_dict_set(&opts, "b", "2.5M", 0);
  * codec = avcodec_find_decoder(AV_CODEC_ID_H264);
@@ -990,17 +1147,36 @@ avcodec_open2(avctx: number,codec: number,options: number): Promise<number>;
  *     exit(1);
  * @endcode
  *
+ * In the case AVCodecParameters are available (e.g. when demuxing a stream
+ * using libavformat, and accessing the AVStream contained in the demuxer), the
+ * codec parameters can be copied to the codec context using
+ * avcodec_parameters_to_context(), as in the following example:
+ *
+ * @code
+ * AVStream *stream = ...;
+ * context = avcodec_alloc_context3(codec);
+ * if (avcodec_parameters_to_context(context, stream->codecpar) < 0)
+ *     exit(1);
+ * if (avcodec_open2(context, codec, NULL) < 0)
+ *     exit(1);
+ * @endcode
+ *
+ * @note Always call this function before using decoding routines (such as
+ * @ref avcodec_receive_frame()).
+ *
  * @param avctx The context to initialize.
  * @param codec The codec to open this context for. If a non-NULL codec has been
  *              previously passed to avcodec_alloc_context3() or
  *              for this context, then this parameter MUST be either NULL or
  *              equal to the previously passed codec.
- * @param options A dictionary filled with AVCodecContext and codec-private options.
- *                On return this object will be filled with options that were not found.
+ * @param options A dictionary filled with AVCodecContext and codec-private
+ *                options, which are set on top of the options already set in
+ *                avctx, can be NULL. On return this object will be filled with
+ *                options that were not found in the avctx codec context.
  *
  * @return zero on success, a negative value on error
  * @see avcodec_alloc_context3(), avcodec_find_decoder(), avcodec_find_encoder(),
- *      av_dict_set(), av_opt_find().
+ *      av_dict_set(), av_opt_set(), av_opt_find(), avcodec_parameters_to_context()
  */
 avcodec_open2_js(avctx: number,codec: number,options: number): Promise<number>;
 /**
@@ -1040,7 +1216,7 @@ avcodec_parameters_from_context(par: number,codec: number): Promise<number>;
 avcodec_parameters_to_context(codec: number,par: number): Promise<number>;
 /**
  * Return decoded output data from a decoder or encoder (when the
- * AV_CODEC_FLAG_RECON_FRAME flag is used).
+ * @ref AV_CODEC_FLAG_RECON_FRAME flag is used).
  *
  * @param avctx codec context
  * @param frame This will be set to a reference-counted video or audio
@@ -1054,10 +1230,7 @@ avcodec_parameters_to_context(codec: number,par: number): Promise<number>;
  * @retval AVERROR_EOF      the codec has been fully flushed, and there will be
  *                          no more output frames
  * @retval AVERROR(EINVAL)  codec not opened, or it is an encoder without the
- *                          AV_CODEC_FLAG_RECON_FRAME flag enabled
- * @retval AVERROR_INPUT_CHANGED current decoded frame has changed parameters with
- *                          respect to first decoded frame. Applicable when flag
- *                          AV_CODEC_FLAG_DROPCHANGED is set.
+ *                          @ref AV_CODEC_FLAG_RECON_FRAME flag enabled
  * @retval "other negative error code" legitimate decoding errors
  */
 avcodec_receive_frame(avctx: number,frame: number): Promise<number>;
@@ -1626,23 +1799,6 @@ sws_freeContext(swsContext: number): Promise<void>;
  * @return 0 on success, a negative AVERROR code on failure
  */
 sws_scale_frame(c: number,dst: number,src: number): Promise<number>;
-AVFrame_sample_aspect_ratio_num(a0: number): Promise<number>;
-AVFrame_sample_aspect_ratio_den(a0: number): Promise<number>;
-AVFrame_sample_aspect_ratio_s(a0: number,a1: number,a2: number): Promise<void>;
-AVCodecContext_framerate_num(a0: number): Promise<number>;
-AVCodecContext_framerate_den(a0: number): Promise<number>;
-AVCodecContext_framerate_num_s(a0: number,a1: number): Promise<void>;
-AVCodecContext_framerate_den_s(a0: number,a1: number): Promise<void>;
-AVCodecContext_framerate_s(a0: number,a1: number,a2: number): Promise<void>;
-AVCodecContext_sample_aspect_ratio_num(a0: number): Promise<number>;
-AVCodecContext_sample_aspect_ratio_den(a0: number): Promise<number>;
-AVCodecContext_sample_aspect_ratio_num_s(a0: number,a1: number): Promise<void>;
-AVCodecContext_sample_aspect_ratio_den_s(a0: number,a1: number): Promise<void>;
-AVCodecContext_sample_aspect_ratio_s(a0: number,a1: number,a2: number): Promise<void>;
-AVCodecContext_time_base_s(a0: number,a1: number,a2: number): Promise<void>;
-AVStream_time_base_num(a0: number): Promise<number>;
-AVStream_time_base_den(a0: number): Promise<number>;
-AVStream_time_base_s(a0: number,a1: number,a2: number): Promise<void>;
 AVPacketSideData_data(a0: number,a1: number): Promise<number>;
 AVPacketSideData_size(a0: number,a1: number): Promise<number>;
 AVPacketSideData_type(a0: number,a1: number): Promise<number>;
@@ -1697,8 +1853,18 @@ AVFrame_pts(ptr: number): Promise<number>;
 AVFrame_pts_s(ptr: number, val: number): Promise<void>;
 AVFrame_ptshi(ptr: number): Promise<number>;
 AVFrame_ptshi_s(ptr: number, val: number): Promise<void>;
+AVFrame_sample_aspect_ratio_num(ptr: number): Promise<number>;
+AVFrame_sample_aspect_ratio_num_s(ptr: number, val: number): Promise<void>;
+AVFrame_sample_aspect_ratio_den(ptr: number): Promise<number>;
+AVFrame_sample_aspect_ratio_den_s(ptr: number, val: number): Promise<void>;
+AVFrame_sample_aspect_ratio_s(ptr: number, num: number, den: number): Promise<void>;
 AVFrame_sample_rate(ptr: number): Promise<number>;
 AVFrame_sample_rate_s(ptr: number, val: number): Promise<void>;
+AVFrame_time_base_num(ptr: number): Promise<number>;
+AVFrame_time_base_num_s(ptr: number, val: number): Promise<void>;
+AVFrame_time_base_den(ptr: number): Promise<number>;
+AVFrame_time_base_den_s(ptr: number, val: number): Promise<void>;
+AVFrame_time_base_s(ptr: number, num: number, den: number): Promise<void>;
 AVFrame_width(ptr: number): Promise<number>;
 AVFrame_width_s(ptr: number, val: number): Promise<void>;
 AVPixFmtDescriptor_flags(ptr: number): Promise<number>;
@@ -1709,6 +1875,7 @@ AVPixFmtDescriptor_log2_chroma_w(ptr: number): Promise<number>;
 AVPixFmtDescriptor_log2_chroma_w_s(ptr: number, val: number): Promise<void>;
 AVPixFmtDescriptor_nb_components(ptr: number): Promise<number>;
 AVPixFmtDescriptor_nb_components_s(ptr: number, val: number): Promise<void>;
+AVCodec_name(ptr: number): Promise<string>;
 AVCodec_sample_fmts(ptr: number): Promise<number>;
 AVCodec_sample_fmts_s(ptr: number, val: number): Promise<void>;
 AVCodec_sample_fmts_a(ptr: number, idx: number): Promise<number>;
@@ -1743,6 +1910,11 @@ AVCodecContext_extradata_size(ptr: number): Promise<number>;
 AVCodecContext_extradata_size_s(ptr: number, val: number): Promise<void>;
 AVCodecContext_frame_size(ptr: number): Promise<number>;
 AVCodecContext_frame_size_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_framerate_num(ptr: number): Promise<number>;
+AVCodecContext_framerate_num_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_framerate_den(ptr: number): Promise<number>;
+AVCodecContext_framerate_den_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_framerate_s(ptr: number, num: number, den: number): Promise<void>;
 AVCodecContext_gop_size(ptr: number): Promise<number>;
 AVCodecContext_gop_size_s(ptr: number, val: number): Promise<void>;
 AVCodecContext_height(ptr: number): Promise<number>;
@@ -1765,10 +1937,20 @@ AVCodecContext_rc_min_rate(ptr: number): Promise<number>;
 AVCodecContext_rc_min_rate_s(ptr: number, val: number): Promise<void>;
 AVCodecContext_rc_min_ratehi(ptr: number): Promise<number>;
 AVCodecContext_rc_min_ratehi_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_sample_aspect_ratio_num(ptr: number): Promise<number>;
+AVCodecContext_sample_aspect_ratio_num_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_sample_aspect_ratio_den(ptr: number): Promise<number>;
+AVCodecContext_sample_aspect_ratio_den_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_sample_aspect_ratio_s(ptr: number, num: number, den: number): Promise<void>;
 AVCodecContext_sample_fmt(ptr: number): Promise<number>;
 AVCodecContext_sample_fmt_s(ptr: number, val: number): Promise<void>;
 AVCodecContext_sample_rate(ptr: number): Promise<number>;
 AVCodecContext_sample_rate_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_time_base_num(ptr: number): Promise<number>;
+AVCodecContext_time_base_num_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_time_base_den(ptr: number): Promise<number>;
+AVCodecContext_time_base_den_s(ptr: number, val: number): Promise<void>;
+AVCodecContext_time_base_s(ptr: number, num: number, den: number): Promise<void>;
 AVCodecContext_qmax(ptr: number): Promise<number>;
 AVCodecContext_qmax_s(ptr: number, val: number): Promise<void>;
 AVCodecContext_qmin(ptr: number): Promise<number>;
@@ -1787,46 +1969,63 @@ AVCodecDescriptor_props(ptr: number): Promise<number>;
 AVCodecDescriptor_props_s(ptr: number, val: number): Promise<void>;
 AVCodecDescriptor_type(ptr: number): Promise<number>;
 AVCodecDescriptor_type_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_bit_rate(ptr: number): Promise<number>;
+AVCodecParameters_bit_rate_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_channel_layoutmask(ptr: number): Promise<number>;
+AVCodecParameters_channel_layoutmask_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_channels(ptr: number): Promise<number>;
+AVCodecParameters_channels_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_ch_layout_nb_channels(ptr: number): Promise<number>;
+AVCodecParameters_ch_layout_nb_channels_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_chroma_location(ptr: number): Promise<number>;
+AVCodecParameters_chroma_location_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_codec_id(ptr: number): Promise<number>;
 AVCodecParameters_codec_id_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_codec_tag(ptr: number): Promise<number>;
 AVCodecParameters_codec_tag_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_codec_type(ptr: number): Promise<number>;
 AVCodecParameters_codec_type_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_color_primaries(ptr: number): Promise<number>;
+AVCodecParameters_color_primaries_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_color_range(ptr: number): Promise<number>;
+AVCodecParameters_color_range_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_color_space(ptr: number): Promise<number>;
+AVCodecParameters_color_space_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_color_trc(ptr: number): Promise<number>;
+AVCodecParameters_color_trc_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_extradata(ptr: number): Promise<number>;
 AVCodecParameters_extradata_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_extradata_size(ptr: number): Promise<number>;
 AVCodecParameters_extradata_size_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_format(ptr: number): Promise<number>;
 AVCodecParameters_format_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_bit_rate(ptr: number): Promise<number>;
-AVCodecParameters_bit_rate_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_profile(ptr: number): Promise<number>;
-AVCodecParameters_profile_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_level(ptr: number): Promise<number>;
-AVCodecParameters_level_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_width(ptr: number): Promise<number>;
-AVCodecParameters_width_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_framerate_num(ptr: number): Promise<number>;
+AVCodecParameters_framerate_num_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_framerate_den(ptr: number): Promise<number>;
+AVCodecParameters_framerate_den_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_framerate_s(ptr: number, num: number, den: number): Promise<void>;
 AVCodecParameters_height(ptr: number): Promise<number>;
 AVCodecParameters_height_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_color_range(ptr: number): Promise<number>;
-AVCodecParameters_color_range_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_color_primaries(ptr: number): Promise<number>;
-AVCodecParameters_color_primaries_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_color_trc(ptr: number): Promise<number>;
-AVCodecParameters_color_trc_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_color_space(ptr: number): Promise<number>;
-AVCodecParameters_color_space_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_chroma_location(ptr: number): Promise<number>;
-AVCodecParameters_chroma_location_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_channels(ptr: number): Promise<number>;
-AVCodecParameters_channels_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_channel_layoutmask(ptr: number): Promise<number>;
-AVCodecParameters_channel_layoutmask_s(ptr: number, val: number): Promise<void>;
-AVCodecParameters_ch_layout_nb_channels(ptr: number): Promise<number>;
-AVCodecParameters_ch_layout_nb_channels_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_level(ptr: number): Promise<number>;
+AVCodecParameters_level_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_profile(ptr: number): Promise<number>;
+AVCodecParameters_profile_s(ptr: number, val: number): Promise<void>;
 AVCodecParameters_sample_rate(ptr: number): Promise<number>;
 AVCodecParameters_sample_rate_s(ptr: number, val: number): Promise<void>;
+AVCodecParameters_width(ptr: number): Promise<number>;
+AVCodecParameters_width_s(ptr: number, val: number): Promise<void>;
+AVPacket_data(ptr: number): Promise<number>;
+AVPacket_data_s(ptr: number, val: number): Promise<void>;
+AVPacket_dts(ptr: number): Promise<number>;
+AVPacket_dts_s(ptr: number, val: number): Promise<void>;
+AVPacket_dtshi(ptr: number): Promise<number>;
+AVPacket_dtshi_s(ptr: number, val: number): Promise<void>;
+AVPacket_duration(ptr: number): Promise<number>;
+AVPacket_duration_s(ptr: number, val: number): Promise<void>;
+AVPacket_durationhi(ptr: number): Promise<number>;
+AVPacket_durationhi_s(ptr: number, val: number): Promise<void>;
+AVPacket_flags(ptr: number): Promise<number>;
+AVPacket_flags_s(ptr: number, val: number): Promise<void>;
 AVPacket_pos(ptr: number): Promise<number>;
 AVPacket_pos_s(ptr: number, val: number): Promise<void>;
 AVPacket_poshi(ptr: number): Promise<number>;
@@ -1835,26 +2034,23 @@ AVPacket_pts(ptr: number): Promise<number>;
 AVPacket_pts_s(ptr: number, val: number): Promise<void>;
 AVPacket_ptshi(ptr: number): Promise<number>;
 AVPacket_ptshi_s(ptr: number, val: number): Promise<void>;
-AVPacket_dts(ptr: number): Promise<number>;
-AVPacket_dts_s(ptr: number, val: number): Promise<void>;
-AVPacket_dtshi(ptr: number): Promise<number>;
-AVPacket_dtshi_s(ptr: number, val: number): Promise<void>;
-AVPacket_data(ptr: number): Promise<number>;
-AVPacket_data_s(ptr: number, val: number): Promise<void>;
-AVPacket_size(ptr: number): Promise<number>;
-AVPacket_size_s(ptr: number, val: number): Promise<void>;
-AVPacket_stream_index(ptr: number): Promise<number>;
-AVPacket_stream_index_s(ptr: number, val: number): Promise<void>;
-AVPacket_flags(ptr: number): Promise<number>;
-AVPacket_flags_s(ptr: number, val: number): Promise<void>;
 AVPacket_side_data(ptr: number): Promise<number>;
 AVPacket_side_data_s(ptr: number, val: number): Promise<void>;
 AVPacket_side_data_elems(ptr: number): Promise<number>;
 AVPacket_side_data_elems_s(ptr: number, val: number): Promise<void>;
-AVPacket_duration(ptr: number): Promise<number>;
-AVPacket_duration_s(ptr: number, val: number): Promise<void>;
-AVPacket_durationhi(ptr: number): Promise<number>;
-AVPacket_durationhi_s(ptr: number, val: number): Promise<void>;
+AVPacket_size(ptr: number): Promise<number>;
+AVPacket_size_s(ptr: number, val: number): Promise<void>;
+AVPacket_stream_index(ptr: number): Promise<number>;
+AVPacket_stream_index_s(ptr: number, val: number): Promise<void>;
+AVPacket_time_base_num(ptr: number): Promise<number>;
+AVPacket_time_base_num_s(ptr: number, val: number): Promise<void>;
+AVPacket_time_base_den(ptr: number): Promise<number>;
+AVPacket_time_base_den_s(ptr: number, val: number): Promise<void>;
+AVPacket_time_base_s(ptr: number, num: number, den: number): Promise<void>;
+AVFormatContext_duration(ptr: number): Promise<number>;
+AVFormatContext_duration_s(ptr: number, val: number): Promise<void>;
+AVFormatContext_durationhi(ptr: number): Promise<number>;
+AVFormatContext_durationhi_s(ptr: number, val: number): Promise<void>;
 AVFormatContext_flags(ptr: number): Promise<number>;
 AVFormatContext_flags_s(ptr: number, val: number): Promise<void>;
 AVFormatContext_nb_streams(ptr: number): Promise<number>;
@@ -1863,6 +2059,10 @@ AVFormatContext_oformat(ptr: number): Promise<number>;
 AVFormatContext_oformat_s(ptr: number, val: number): Promise<void>;
 AVFormatContext_pb(ptr: number): Promise<number>;
 AVFormatContext_pb_s(ptr: number, val: number): Promise<void>;
+AVFormatContext_start_time(ptr: number): Promise<number>;
+AVFormatContext_start_time_s(ptr: number, val: number): Promise<void>;
+AVFormatContext_start_timehi(ptr: number): Promise<number>;
+AVFormatContext_start_timehi_s(ptr: number, val: number): Promise<void>;
 AVFormatContext_streams_a(ptr: number, idx: number): Promise<number>;
 AVFormatContext_streams_a_s(ptr: number, idx: number, val: number): Promise<void>;
 AVStream_codecpar(ptr: number): Promise<number>;
@@ -1873,6 +2073,11 @@ AVStream_duration(ptr: number): Promise<number>;
 AVStream_duration_s(ptr: number, val: number): Promise<void>;
 AVStream_durationhi(ptr: number): Promise<number>;
 AVStream_durationhi_s(ptr: number, val: number): Promise<void>;
+AVStream_time_base_num(ptr: number): Promise<number>;
+AVStream_time_base_num_s(ptr: number, val: number): Promise<void>;
+AVStream_time_base_den(ptr: number): Promise<number>;
+AVStream_time_base_den_s(ptr: number, val: number): Promise<void>;
+AVStream_time_base_s(ptr: number, num: number, den: number): Promise<void>;
 AVFilterInOut_filter_ctx(ptr: number): Promise<number>;
 AVFilterInOut_filter_ctx_s(ptr: number, val: number): Promise<void>;
 AVFilterInOut_name(ptr: number): Promise<number>;
@@ -1898,7 +2103,7 @@ copyout_s32(ptr: number, len: number): Promise<Int32Array>;
 copyin_f32(ptr: number, arr: Float32Array): Promise<void>;
 copyout_f32(ptr: number, len: number): Promise<Float32Array>;
 
-/**
+    /**
  * Read a complete file from the in-memory filesystem.
  * @param name  Filename to read
  */
@@ -1950,6 +2155,11 @@ mkblockreaderdev(name: string, size: number): Promise<void>;
  */
 mkreadaheadfile(name: string, file: Blob): Promise<void>;
 /**
+ * Unlink a readahead file. Also gets rid of the File reference.
+ * @param name  Filename to unlink.
+ */
+unlinkreadaheadfile(name: string): Promise<void>;
+/**
  * Make a writer device.
  * @param name  Filename to create
  * @param mode  Unix permissions
@@ -1982,6 +2192,20 @@ mkworkerfsfile(name: string, blob: Blob): Promise<string>;
  */
 unlinkworkerfsfile(name: string): Promise<void>;
 /**
+ * Make a FileSystemFileHandle device. This writes via a FileSystemFileHandle,
+ * synchronously if possible. Note that this overrides onwrite, so if you want
+ * to support both kinds of files, make sure you set onwrite before calling
+ * this.
+ * @param name  Filename to create.
+ * @param fsfh  FileSystemFileHandle corresponding to this filename.
+ */
+mkfsfhfile(name: string, fsfh: FileSystemFileHandle): Promise<void>;
+/**
+ * Unlink a FileSystemFileHandle file. Also closes the file handle.
+ * @param name  Filename to unlink.
+ */
+unlinkfsfhfile(name: string): Promise<void>;
+/**
  * Send some data to a reader device. To indicate EOF, send null. To indicate an
  * error, send EOF and include an error code in the options.
  * @param name  Filename of the reader device.
@@ -2013,6 +2237,8 @@ ff_block_reader_dev_send(
     }
 ): Promise<void>;
 /**
+ * @deprecated
+ * DEPRECATED. Use the onread callback.
  * Metafunction to determine whether any device has any waiters. This can be
  * used to determine whether more data needs to be sent before a previous step
  * will be fully resolved.
@@ -2037,10 +2263,14 @@ ff_init_encoder(
  * Similar to ff_init_encoder but doesn't need to initialize the frame.
  * Returns [AVCodec, AVCodecContext, AVPacket, AVFrame]
  * @param name  libav decoder identifier or name
- * @param codecpar  Optional AVCodecParameters
+ * @param config  Decoder configuration. Can just be a number for codec
+ *                parameters, or can be multiple configuration options.
  */
 ff_init_decoder(
-    name: string | number, codecpar?: number
+    name: string | number, config?: number | {
+        codecpar?: number | CodecParameters,
+        time_base?: [number, number]
+    }
 ): Promise<[number, number, number, number]>;
 /**
  * Free everything allocated by ff_init_encoder.
@@ -2067,12 +2297,22 @@ ff_free_decoder(
  * @param frame  AVFrame
  * @param pkt  AVPacket
  * @param inFrames  Array of frames in libav.js format
- * @param fin  Set to true if this is the end of encoding
+ * @param config  Encoding options. May be "true" to indicate end of stream.
  */
 ff_encode_multi(
     ctx: number, frame: number, pkt: number, inFrames: (Frame | number)[],
-    fin?: boolean
-): Promise<Packet[]>;
+    config?: boolean | {
+        fin?: boolean,
+        copyoutPacket?: "default"
+    }
+): Promise<Packet[]>
+ff_encode_multi(
+    ctx: number, frame: number, pkt: number, inFrames: (Frame | number)[],
+    config: {
+        fin?: boolean,
+        copyoutPacket: "ptr"
+    }
+): Promise<number[]>;
 /**
  * Decode some number of packets at once. Done in one go to avoid excess
  * message passing.
@@ -2092,7 +2332,7 @@ ff_decode_multi(
 ): Promise<Frame[]>
 ff_decode_multi(
     ctx: number, pkt: number, frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ptr"
@@ -2100,7 +2340,7 @@ ff_decode_multi(
 ): Promise<number[]>
 ff_decode_multi(
     ctx: number, pkt: number, frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ImageData"
@@ -2169,7 +2409,7 @@ ff_read_frame_multi(
     }
 ): Promise<[number, Record<number, Packet[]>]>
 ff_read_frame_multi(
-    fmt_ctx: number, pkt: number, opts?: {
+    fmt_ctx: number, pkt: number, opts: {
         limit?: number, // OUTPUT limit, in bytes
         unify?: boolean, // If true, unify the packets into a single stream (called 0), so that the output is in the same order as the input
         copyoutPacket: "ptr" // Version of ff_copyout_packet to use
@@ -2188,14 +2428,14 @@ ff_read_frame_multi(
  * @param opts  Other options
  */
 ff_read_multi(
-    fmt_ctx: number, pkt: number, devfile?: string, opts?: {
+    fmt_ctx: number, pkt: number, devfile?: string | null, opts?: {
         limit?: number, // OUTPUT limit, in bytes
         unify?: boolean, // If true, unify the packets into a single stream (called 0), so that the output is in the same order as the input
         copyoutPacket?: "default" // Version of ff_copyout_packet to use
     }
 ): Promise<[number, Record<number, Packet[]>]>
 ff_read_multi(
-    fmt_ctx: number, pkt: number, devfile?: string, opts?: {
+    fmt_ctx: number, pkt: number, devfile: string | null, opts: {
         limit?: number, // OUTPUT limit, in bytes
         devLimit?: number, // INPUT limit, in bytes (don't read if less than this much data is available)
         unify?: boolean, // If true, unify the packets into a single stream (called 0), so that the output is in the same order as the input
@@ -2236,6 +2476,10 @@ ff_init_filter_graph(
 ): Promise<[number, number[], number[]]>;
 /**
  * Filter some number of frames, possibly corresponding to multiple sources.
+ * Only one sink is allowed, but config is per source. Set
+ * `config.ignoreSinkTimebase` to leave frames' timebase as it was, rather than
+ * imposing the timebase of the buffer sink. Set `config.copyoutFrame` to use a
+ * different copier than the default.
  * @param srcs  AVFilterContext(s), input
  * @param buffersink_ctx  AVFilterContext, output
  * @param framePtr  AVFrame
@@ -2247,6 +2491,7 @@ ff_filter_multi(
     srcs: number, buffersink_ctx: number, framePtr: number,
     inFrames: (Frame | number)[], config?: boolean | {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame?: "default" | "video" | "video_packed"
     }
 ): Promise<Frame[]>;
@@ -2254,34 +2499,39 @@ ff_filter_multi(
     srcs: number[], buffersink_ctx: number, framePtr: number,
     inFrames: (Frame | number)[][], config?: boolean[] | {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame?: "default" | "video" | "video_packed"
     }[]
 ): Promise<Frame[]>
 ff_filter_multi(
     srcs: number, buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[], config?: boolean | {
+    inFrames: (Frame | number)[], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ptr"
     }
 ): Promise<number[]>;
 ff_filter_multi(
     srcs: number[], buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[][], config?: boolean[] | {
+    inFrames: (Frame | number)[][], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ptr"
     }[]
 ): Promise<number[]>
 ff_filter_multi(
     srcs: number, buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[], config?: boolean | {
+    inFrames: (Frame | number)[], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ImageData"
     }
 ): Promise<ImageData[]>;
 ff_filter_multi(
     srcs: number[], buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[][], config?: boolean[] | {
+    inFrames: (Frame | number)[][], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ImageData"
     }[]
 ): Promise<ImageData[]>;
@@ -2309,7 +2559,7 @@ ff_decode_filter_multi(
 ff_decode_filter_multi(
     ctx: number, buffersrc_ctx: number, buffersink_ctx: number, pkt: number,
     frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ptr"
@@ -2318,7 +2568,7 @@ ff_decode_filter_multi(
 ff_decode_filter_multi(
     ctx: number, buffersrc_ctx: number, buffersink_ctx: number, pkt: number,
     frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ImageData"
@@ -2377,6 +2627,17 @@ ff_copyout_packet_ptr(pkt: number): Promise<number>;
  */
 ff_copyin_packet(pktPtr: number, packet: Packet | number): Promise<void>;
 /**
+ * Copy out codec parameters.
+ * @param codecpar  AVCodecParameters
+ */
+ff_copyout_codecpar(codecpar: number): Promise<CodecParameters>;
+/**
+ * Copy in codec parameters.
+ * @param codecparPtr  AVCodecParameters
+ * @param codecpar  Codec parameters to copy in.
+ */
+ff_copyin_codecpar(codecparPtr: number, codecpar: CodecParameters): Promise<void>;
+/**
  * Allocate and copy in a 32-bit int list.
  * @param list  List of numbers to copy in
  */
@@ -2416,70 +2677,84 @@ ffmpeg(...args: (string | string[])[]): Promise<number>;
 ffprobe(...args: (string | string[])[]): Promise<number>;
 
 
-    // Declarations for things that use int64, so will be communicated incorrectly
+        // Declarations for things that use int64, so will be communicated incorrectly
+
+        /**
+         * Seek to timestamp ts, bounded by min_ts and max_ts. All 64-bit ints are
+         * in the form of low and high bits.
+         */
+        avformat_seek_file(
+            s: number, stream_index: number, min_tslo: number, min_tshi: number,
+            tslo: number, tshi: number, max_tslo: number, max_tshi: number,
+            flags: number
+        ): Promise<number>;
+
+        /**
+         * Seek to *at the earliest* the given timestamp.
+         */
+        avformat_seek_file_min(
+            s: number, stream_index: number, tslo: number, tshi: number,
+            flags: number
+        ): Promise<number>;
+
+        /**
+         * Seek to *at the latest* the given timestamp.
+         */
+        avformat_seek_file_max(
+            s: number, stream_index: number, tslo: number, tshi: number,
+            flags: number
+        ): Promise<number>;
+
+        /**
+         * Seek to as close to this timestamp as the format allows.
+         */
+        avformat_seek_file_approx(
+            s: number, stream_index: number, tslo: number, tshi: number,
+            flags: number
+        ): Promise<number>;
+
+        /**
+         * Seek to the keyframe at timestamp 'timestamp' in 'stream_index'.
+         */
+        av_seek_frame(
+            s: number, stream_index: number,
+            timestamplo: number, timestamphi: number,
+            flags: number
+        ): Promise<number>;
+
+        /**
+         * Get the depth of this component of this pixel format.
+         */
+        AVPixFmtDescriptor_comp_depth(fmt: number, comp: number): Promise<number>;
+
+
+        /**
+         * Callback when writes occur. Set by the user.
+         */
+        onwrite?: (filename: string, position: number, buffer: Uint8Array | Int8Array) => void;
+
+        /**
+         * Callback for stream reader devices. Set by the user.
+         */
+        onread?: (filename: string, pos: number, length: number) => void;
+
+        /**
+         * Callback for block reader devices. Set by the user.
+         */
+        onblockread?: (filename: string, pos: number, length: number) => void;
+
+        /**
+         * Terminate the worker associated with this libav.js instance, rendering
+         * it inoperable and freeing its memory.
+         */
+        terminate(): void;
+    }
 
     /**
-     * Seek to timestamp ts, bounded by min_ts and max_ts. All 64-bit ints are
-     * in the form of low and high bits.
+     * Synchronous functions, available on non-worker libav.js instances.
      */
-    avformat_seek_file(
-        s: number, stream_index: number, min_tslo: number, min_tshi: number,
-        tslo: number, tshi: number, max_tslo: number, max_tshi: number,
-        flags: number
-    ): Promise<number>;
-
+    export interface LibAVSync {
     /**
-     * Seek to *at the earliest* the given timestamp.
-     */
-    avformat_seek_file_min(
-        s: number, stream_index: number, tslo: number, tshi: number,
-        flags: number
-    ): Promise<number>;
-
-    /**
-     * Seek to *at the latest* the given timestamp.
-     */
-    avformat_seek_file_max(
-        s: number, stream_index: number, tslo: number, tshi: number,
-        flags: number
-    ): Promise<number>;
-
-    /**
-     * Seek to as close to this timestamp as the format allows.
-     */
-    avformat_seek_file_approx(
-        s: number, stream_index: number, tslo: number, tshi: number,
-        flags: number
-    ): Promise<number>;
-
-    /**
-     * Get the depth of this component of this pixel format.
-     */
-    AVPixFmtDescriptor_comp_depth(fmt: number, comp: number): Promise<number>;
-
-
-    /**
-     * Callback when writes occur. Set by the user.
-     */
-    onwrite?: (filename: string, position: number, buffer: Uint8Array | Int8Array) => void;
-
-    /**
-     * Callback for bock reader devices. Set by the user.
-     */
-    onblockread?: (filename: string, pos: number, length: number) => void;
-
-    /**
-     * Terminate the worker associated with this libav.js instance, rendering
-     * it inoperable and freeing its memory.
-     */
-    terminate(): void;
-}
-
-/**
- * Synchronous functions, available on non-worker libav.js instances.
- */
-export interface LibAVSync {
-/**
  * Return number of bytes per sample.
  *
  * @param sample_fmt the sample format
@@ -2615,6 +2890,7 @@ av_frame_ref_sync(dst: number,src: number): number;
  * Unreference all the buffers referenced by frame and reset the frame fields.
  */
 av_frame_unref_sync(frame: number): void;
+ff_frame_rescale_ts_js_sync(a0: number,a1: number,a2: number,a3: number,a4: number): void;
 /**
  * Get the current log level
  *
@@ -2734,6 +3010,8 @@ av_strdup_sync(s: string): number;
  *         - A different negative AVERROR code in other failure cases.
  */
 av_buffersink_get_frame_sync(ctx: number,frame: number): number;
+av_buffersink_get_time_base_num_sync(a0: number): number;
+av_buffersink_get_time_base_den_sync(a0: number): number;
 /**
  * Set the frame size for an audio buffer sink.
  *
@@ -2742,6 +3020,7 @@ av_buffersink_get_frame_sync(ctx: number,frame: number): number;
  * not enough. The last buffer at EOF will be padded with 0.
  */
 av_buffersink_set_frame_size_sync(ctx: number,frame_size: number): void;
+ff_buffersink_set_ch_layout_sync(a0: number,a1: number,a2: number): number;
 /**
  * Add a frame to the buffer source.
  *
@@ -2868,7 +3147,7 @@ avcodec_alloc_context3_sync(codec: number): number;
  * the codec-specific data allocated in avcodec_alloc_context3() with a non-NULL
  * codec. Subsequent calls will do nothing.
  *
- * @note Do not use this function. Use avcodec_free_context() to destroy a
+ * @deprecated Do not use this function. Use avcodec_free_context() to destroy a
  * codec context (either open or closed). Opening and closing a codec context
  * multiple times is not supported anymore -- use multiple codec contexts
  * instead.
@@ -2920,6 +3199,21 @@ avcodec_find_encoder_sync(id: number): number;
  */
 avcodec_find_encoder_by_name_sync(name: string): number;
 /**
+ * Reset the internal codec state / flush internal buffers. Should be called
+ * e.g. when seeking or when switching to a different stream.
+ *
+ * @note for decoders, this function just releases any references the decoder
+ * might keep internally, but the caller's references remain valid.
+ *
+ * @note for encoders, this function will only do something if the encoder
+ * declares support for AV_CODEC_CAP_ENCODER_FLUSH. When called, the encoder
+ * will drain any remaining packets, and can then be re-used for a different
+ * stream (as opposed to sending a null frame which will leave the encoder
+ * in a permanent EOF state after draining). This can be desirable if the
+ * cost of tearing down and replacing the encoder instance is high.
+ */
+avcodec_flush_buffers_sync(avctx: number): void;
+/**
  * Free the codec context and everything associated with it and write NULL to
  * the provided pointer.
  */
@@ -2937,9 +3231,16 @@ avcodec_get_name_sync(id: number): string;
  * avcodec_find_decoder() and avcodec_find_encoder() provide an easy way for
  * retrieving a codec.
  *
- * @note Always call this function before using decoding routines (such as
- * @ref avcodec_receive_frame()).
+ * Depending on the codec, you might need to set options in the codec context
+ * also for decoding (e.g. width, height, or the pixel or audio sample format in
+ * the case the information is not available in the bitstream, as when decoding
+ * raw audio or video).
  *
+ * Options in the codec context can be set either by setting them in the options
+ * AVDictionary, or by setting the values in the context itself, directly or by
+ * using the av_opt_set() API before calling this function.
+ *
+ * Example:
  * @code
  * av_dict_set(&opts, "b", "2.5M", 0);
  * codec = avcodec_find_decoder(AV_CODEC_ID_H264);
@@ -2952,17 +3253,36 @@ avcodec_get_name_sync(id: number): string;
  *     exit(1);
  * @endcode
  *
+ * In the case AVCodecParameters are available (e.g. when demuxing a stream
+ * using libavformat, and accessing the AVStream contained in the demuxer), the
+ * codec parameters can be copied to the codec context using
+ * avcodec_parameters_to_context(), as in the following example:
+ *
+ * @code
+ * AVStream *stream = ...;
+ * context = avcodec_alloc_context3(codec);
+ * if (avcodec_parameters_to_context(context, stream->codecpar) < 0)
+ *     exit(1);
+ * if (avcodec_open2(context, codec, NULL) < 0)
+ *     exit(1);
+ * @endcode
+ *
+ * @note Always call this function before using decoding routines (such as
+ * @ref avcodec_receive_frame()).
+ *
  * @param avctx The context to initialize.
  * @param codec The codec to open this context for. If a non-NULL codec has been
  *              previously passed to avcodec_alloc_context3() or
  *              for this context, then this parameter MUST be either NULL or
  *              equal to the previously passed codec.
- * @param options A dictionary filled with AVCodecContext and codec-private options.
- *                On return this object will be filled with options that were not found.
+ * @param options A dictionary filled with AVCodecContext and codec-private
+ *                options, which are set on top of the options already set in
+ *                avctx, can be NULL. On return this object will be filled with
+ *                options that were not found in the avctx codec context.
  *
  * @return zero on success, a negative value on error
  * @see avcodec_alloc_context3(), avcodec_find_decoder(), avcodec_find_encoder(),
- *      av_dict_set(), av_opt_find().
+ *      av_dict_set(), av_opt_set(), av_opt_find(), avcodec_parameters_to_context()
  */
 avcodec_open2_sync(avctx: number,codec: number,options: number): number;
 /**
@@ -2973,9 +3293,16 @@ avcodec_open2_sync(avctx: number,codec: number,options: number): number;
  * avcodec_find_decoder() and avcodec_find_encoder() provide an easy way for
  * retrieving a codec.
  *
- * @note Always call this function before using decoding routines (such as
- * @ref avcodec_receive_frame()).
+ * Depending on the codec, you might need to set options in the codec context
+ * also for decoding (e.g. width, height, or the pixel or audio sample format in
+ * the case the information is not available in the bitstream, as when decoding
+ * raw audio or video).
  *
+ * Options in the codec context can be set either by setting them in the options
+ * AVDictionary, or by setting the values in the context itself, directly or by
+ * using the av_opt_set() API before calling this function.
+ *
+ * Example:
  * @code
  * av_dict_set(&opts, "b", "2.5M", 0);
  * codec = avcodec_find_decoder(AV_CODEC_ID_H264);
@@ -2988,17 +3315,36 @@ avcodec_open2_sync(avctx: number,codec: number,options: number): number;
  *     exit(1);
  * @endcode
  *
+ * In the case AVCodecParameters are available (e.g. when demuxing a stream
+ * using libavformat, and accessing the AVStream contained in the demuxer), the
+ * codec parameters can be copied to the codec context using
+ * avcodec_parameters_to_context(), as in the following example:
+ *
+ * @code
+ * AVStream *stream = ...;
+ * context = avcodec_alloc_context3(codec);
+ * if (avcodec_parameters_to_context(context, stream->codecpar) < 0)
+ *     exit(1);
+ * if (avcodec_open2(context, codec, NULL) < 0)
+ *     exit(1);
+ * @endcode
+ *
+ * @note Always call this function before using decoding routines (such as
+ * @ref avcodec_receive_frame()).
+ *
  * @param avctx The context to initialize.
  * @param codec The codec to open this context for. If a non-NULL codec has been
  *              previously passed to avcodec_alloc_context3() or
  *              for this context, then this parameter MUST be either NULL or
  *              equal to the previously passed codec.
- * @param options A dictionary filled with AVCodecContext and codec-private options.
- *                On return this object will be filled with options that were not found.
+ * @param options A dictionary filled with AVCodecContext and codec-private
+ *                options, which are set on top of the options already set in
+ *                avctx, can be NULL. On return this object will be filled with
+ *                options that were not found in the avctx codec context.
  *
  * @return zero on success, a negative value on error
  * @see avcodec_alloc_context3(), avcodec_find_decoder(), avcodec_find_encoder(),
- *      av_dict_set(), av_opt_find().
+ *      av_dict_set(), av_opt_set(), av_opt_find(), avcodec_parameters_to_context()
  */
 avcodec_open2_js_sync(avctx: number,codec: number,options: number): number;
 /**
@@ -3038,7 +3384,7 @@ avcodec_parameters_from_context_sync(par: number,codec: number): number;
 avcodec_parameters_to_context_sync(codec: number,par: number): number;
 /**
  * Return decoded output data from a decoder or encoder (when the
- * AV_CODEC_FLAG_RECON_FRAME flag is used).
+ * @ref AV_CODEC_FLAG_RECON_FRAME flag is used).
  *
  * @param avctx codec context
  * @param frame This will be set to a reference-counted video or audio
@@ -3052,10 +3398,7 @@ avcodec_parameters_to_context_sync(codec: number,par: number): number;
  * @retval AVERROR_EOF      the codec has been fully flushed, and there will be
  *                          no more output frames
  * @retval AVERROR(EINVAL)  codec not opened, or it is an encoder without the
- *                          AV_CODEC_FLAG_RECON_FRAME flag enabled
- * @retval AVERROR_INPUT_CHANGED current decoded frame has changed parameters with
- *                          respect to first decoded frame. Applicable when flag
- *                          AV_CODEC_FLAG_DROPCHANGED is set.
+ *                          @ref AV_CODEC_FLAG_RECON_FRAME flag enabled
  * @retval "other negative error code" legitimate decoding errors
  */
 avcodec_receive_frame_sync(avctx: number,frame: number): number;
@@ -3624,23 +3967,6 @@ sws_freeContext_sync(swsContext: number): void;
  * @return 0 on success, a negative AVERROR code on failure
  */
 sws_scale_frame_sync(c: number,dst: number,src: number): number;
-AVFrame_sample_aspect_ratio_num_sync(a0: number): number;
-AVFrame_sample_aspect_ratio_den_sync(a0: number): number;
-AVFrame_sample_aspect_ratio_s_sync(a0: number,a1: number,a2: number): void;
-AVCodecContext_framerate_num_sync(a0: number): number;
-AVCodecContext_framerate_den_sync(a0: number): number;
-AVCodecContext_framerate_num_s_sync(a0: number,a1: number): void;
-AVCodecContext_framerate_den_s_sync(a0: number,a1: number): void;
-AVCodecContext_framerate_s_sync(a0: number,a1: number,a2: number): void;
-AVCodecContext_sample_aspect_ratio_num_sync(a0: number): number;
-AVCodecContext_sample_aspect_ratio_den_sync(a0: number): number;
-AVCodecContext_sample_aspect_ratio_num_s_sync(a0: number,a1: number): void;
-AVCodecContext_sample_aspect_ratio_den_s_sync(a0: number,a1: number): void;
-AVCodecContext_sample_aspect_ratio_s_sync(a0: number,a1: number,a2: number): void;
-AVCodecContext_time_base_s_sync(a0: number,a1: number,a2: number): void;
-AVStream_time_base_num_sync(a0: number): number;
-AVStream_time_base_den_sync(a0: number): number;
-AVStream_time_base_s_sync(a0: number,a1: number,a2: number): void;
 AVPacketSideData_data_sync(a0: number,a1: number): number;
 AVPacketSideData_size_sync(a0: number,a1: number): number;
 AVPacketSideData_type_sync(a0: number,a1: number): number;
@@ -3695,8 +4021,18 @@ AVFrame_pts_sync(ptr: number): number;
 AVFrame_pts_s_sync(ptr: number, val: number): void;
 AVFrame_ptshi_sync(ptr: number): number;
 AVFrame_ptshi_s_sync(ptr: number, val: number): void;
+AVFrame_sample_aspect_ratio_num_sync(ptr: number): number;
+AVFrame_sample_aspect_ratio_num_s_sync(ptr: number, val: number): void;
+AVFrame_sample_aspect_ratio_den_sync(ptr: number): number;
+AVFrame_sample_aspect_ratio_den_s_sync(ptr: number, val: number): void;
+AVFrame_sample_aspect_ratio_s_sync(ptr: number, num: number, den: number): void;
 AVFrame_sample_rate_sync(ptr: number): number;
 AVFrame_sample_rate_s_sync(ptr: number, val: number): void;
+AVFrame_time_base_num_sync(ptr: number): number;
+AVFrame_time_base_num_s_sync(ptr: number, val: number): void;
+AVFrame_time_base_den_sync(ptr: number): number;
+AVFrame_time_base_den_s_sync(ptr: number, val: number): void;
+AVFrame_time_base_s_sync(ptr: number, num: number, den: number): void;
 AVFrame_width_sync(ptr: number): number;
 AVFrame_width_s_sync(ptr: number, val: number): void;
 AVPixFmtDescriptor_flags_sync(ptr: number): number;
@@ -3707,6 +4043,7 @@ AVPixFmtDescriptor_log2_chroma_w_sync(ptr: number): number;
 AVPixFmtDescriptor_log2_chroma_w_s_sync(ptr: number, val: number): void;
 AVPixFmtDescriptor_nb_components_sync(ptr: number): number;
 AVPixFmtDescriptor_nb_components_s_sync(ptr: number, val: number): void;
+AVCodec_name_sync(ptr: number): string;
 AVCodec_sample_fmts_sync(ptr: number): number;
 AVCodec_sample_fmts_s_sync(ptr: number, val: number): void;
 AVCodec_sample_fmts_a_sync(ptr: number, idx: number): number;
@@ -3741,6 +4078,11 @@ AVCodecContext_extradata_size_sync(ptr: number): number;
 AVCodecContext_extradata_size_s_sync(ptr: number, val: number): void;
 AVCodecContext_frame_size_sync(ptr: number): number;
 AVCodecContext_frame_size_s_sync(ptr: number, val: number): void;
+AVCodecContext_framerate_num_sync(ptr: number): number;
+AVCodecContext_framerate_num_s_sync(ptr: number, val: number): void;
+AVCodecContext_framerate_den_sync(ptr: number): number;
+AVCodecContext_framerate_den_s_sync(ptr: number, val: number): void;
+AVCodecContext_framerate_s_sync(ptr: number, num: number, den: number): void;
 AVCodecContext_gop_size_sync(ptr: number): number;
 AVCodecContext_gop_size_s_sync(ptr: number, val: number): void;
 AVCodecContext_height_sync(ptr: number): number;
@@ -3763,10 +4105,20 @@ AVCodecContext_rc_min_rate_sync(ptr: number): number;
 AVCodecContext_rc_min_rate_s_sync(ptr: number, val: number): void;
 AVCodecContext_rc_min_ratehi_sync(ptr: number): number;
 AVCodecContext_rc_min_ratehi_s_sync(ptr: number, val: number): void;
+AVCodecContext_sample_aspect_ratio_num_sync(ptr: number): number;
+AVCodecContext_sample_aspect_ratio_num_s_sync(ptr: number, val: number): void;
+AVCodecContext_sample_aspect_ratio_den_sync(ptr: number): number;
+AVCodecContext_sample_aspect_ratio_den_s_sync(ptr: number, val: number): void;
+AVCodecContext_sample_aspect_ratio_s_sync(ptr: number, num: number, den: number): void;
 AVCodecContext_sample_fmt_sync(ptr: number): number;
 AVCodecContext_sample_fmt_s_sync(ptr: number, val: number): void;
 AVCodecContext_sample_rate_sync(ptr: number): number;
 AVCodecContext_sample_rate_s_sync(ptr: number, val: number): void;
+AVCodecContext_time_base_num_sync(ptr: number): number;
+AVCodecContext_time_base_num_s_sync(ptr: number, val: number): void;
+AVCodecContext_time_base_den_sync(ptr: number): number;
+AVCodecContext_time_base_den_s_sync(ptr: number, val: number): void;
+AVCodecContext_time_base_s_sync(ptr: number, num: number, den: number): void;
 AVCodecContext_qmax_sync(ptr: number): number;
 AVCodecContext_qmax_s_sync(ptr: number, val: number): void;
 AVCodecContext_qmin_sync(ptr: number): number;
@@ -3785,46 +4137,63 @@ AVCodecDescriptor_props_sync(ptr: number): number;
 AVCodecDescriptor_props_s_sync(ptr: number, val: number): void;
 AVCodecDescriptor_type_sync(ptr: number): number;
 AVCodecDescriptor_type_s_sync(ptr: number, val: number): void;
+AVCodecParameters_bit_rate_sync(ptr: number): number;
+AVCodecParameters_bit_rate_s_sync(ptr: number, val: number): void;
+AVCodecParameters_channel_layoutmask_sync(ptr: number): number;
+AVCodecParameters_channel_layoutmask_s_sync(ptr: number, val: number): void;
+AVCodecParameters_channels_sync(ptr: number): number;
+AVCodecParameters_channels_s_sync(ptr: number, val: number): void;
+AVCodecParameters_ch_layout_nb_channels_sync(ptr: number): number;
+AVCodecParameters_ch_layout_nb_channels_s_sync(ptr: number, val: number): void;
+AVCodecParameters_chroma_location_sync(ptr: number): number;
+AVCodecParameters_chroma_location_s_sync(ptr: number, val: number): void;
 AVCodecParameters_codec_id_sync(ptr: number): number;
 AVCodecParameters_codec_id_s_sync(ptr: number, val: number): void;
 AVCodecParameters_codec_tag_sync(ptr: number): number;
 AVCodecParameters_codec_tag_s_sync(ptr: number, val: number): void;
 AVCodecParameters_codec_type_sync(ptr: number): number;
 AVCodecParameters_codec_type_s_sync(ptr: number, val: number): void;
+AVCodecParameters_color_primaries_sync(ptr: number): number;
+AVCodecParameters_color_primaries_s_sync(ptr: number, val: number): void;
+AVCodecParameters_color_range_sync(ptr: number): number;
+AVCodecParameters_color_range_s_sync(ptr: number, val: number): void;
+AVCodecParameters_color_space_sync(ptr: number): number;
+AVCodecParameters_color_space_s_sync(ptr: number, val: number): void;
+AVCodecParameters_color_trc_sync(ptr: number): number;
+AVCodecParameters_color_trc_s_sync(ptr: number, val: number): void;
 AVCodecParameters_extradata_sync(ptr: number): number;
 AVCodecParameters_extradata_s_sync(ptr: number, val: number): void;
 AVCodecParameters_extradata_size_sync(ptr: number): number;
 AVCodecParameters_extradata_size_s_sync(ptr: number, val: number): void;
 AVCodecParameters_format_sync(ptr: number): number;
 AVCodecParameters_format_s_sync(ptr: number, val: number): void;
-AVCodecParameters_bit_rate_sync(ptr: number): number;
-AVCodecParameters_bit_rate_s_sync(ptr: number, val: number): void;
-AVCodecParameters_profile_sync(ptr: number): number;
-AVCodecParameters_profile_s_sync(ptr: number, val: number): void;
-AVCodecParameters_level_sync(ptr: number): number;
-AVCodecParameters_level_s_sync(ptr: number, val: number): void;
-AVCodecParameters_width_sync(ptr: number): number;
-AVCodecParameters_width_s_sync(ptr: number, val: number): void;
+AVCodecParameters_framerate_num_sync(ptr: number): number;
+AVCodecParameters_framerate_num_s_sync(ptr: number, val: number): void;
+AVCodecParameters_framerate_den_sync(ptr: number): number;
+AVCodecParameters_framerate_den_s_sync(ptr: number, val: number): void;
+AVCodecParameters_framerate_s_sync(ptr: number, num: number, den: number): void;
 AVCodecParameters_height_sync(ptr: number): number;
 AVCodecParameters_height_s_sync(ptr: number, val: number): void;
-AVCodecParameters_color_range_sync(ptr: number): number;
-AVCodecParameters_color_range_s_sync(ptr: number, val: number): void;
-AVCodecParameters_color_primaries_sync(ptr: number): number;
-AVCodecParameters_color_primaries_s_sync(ptr: number, val: number): void;
-AVCodecParameters_color_trc_sync(ptr: number): number;
-AVCodecParameters_color_trc_s_sync(ptr: number, val: number): void;
-AVCodecParameters_color_space_sync(ptr: number): number;
-AVCodecParameters_color_space_s_sync(ptr: number, val: number): void;
-AVCodecParameters_chroma_location_sync(ptr: number): number;
-AVCodecParameters_chroma_location_s_sync(ptr: number, val: number): void;
-AVCodecParameters_channels_sync(ptr: number): number;
-AVCodecParameters_channels_s_sync(ptr: number, val: number): void;
-AVCodecParameters_channel_layoutmask_sync(ptr: number): number;
-AVCodecParameters_channel_layoutmask_s_sync(ptr: number, val: number): void;
-AVCodecParameters_ch_layout_nb_channels_sync(ptr: number): number;
-AVCodecParameters_ch_layout_nb_channels_s_sync(ptr: number, val: number): void;
+AVCodecParameters_level_sync(ptr: number): number;
+AVCodecParameters_level_s_sync(ptr: number, val: number): void;
+AVCodecParameters_profile_sync(ptr: number): number;
+AVCodecParameters_profile_s_sync(ptr: number, val: number): void;
 AVCodecParameters_sample_rate_sync(ptr: number): number;
 AVCodecParameters_sample_rate_s_sync(ptr: number, val: number): void;
+AVCodecParameters_width_sync(ptr: number): number;
+AVCodecParameters_width_s_sync(ptr: number, val: number): void;
+AVPacket_data_sync(ptr: number): number;
+AVPacket_data_s_sync(ptr: number, val: number): void;
+AVPacket_dts_sync(ptr: number): number;
+AVPacket_dts_s_sync(ptr: number, val: number): void;
+AVPacket_dtshi_sync(ptr: number): number;
+AVPacket_dtshi_s_sync(ptr: number, val: number): void;
+AVPacket_duration_sync(ptr: number): number;
+AVPacket_duration_s_sync(ptr: number, val: number): void;
+AVPacket_durationhi_sync(ptr: number): number;
+AVPacket_durationhi_s_sync(ptr: number, val: number): void;
+AVPacket_flags_sync(ptr: number): number;
+AVPacket_flags_s_sync(ptr: number, val: number): void;
 AVPacket_pos_sync(ptr: number): number;
 AVPacket_pos_s_sync(ptr: number, val: number): void;
 AVPacket_poshi_sync(ptr: number): number;
@@ -3833,26 +4202,23 @@ AVPacket_pts_sync(ptr: number): number;
 AVPacket_pts_s_sync(ptr: number, val: number): void;
 AVPacket_ptshi_sync(ptr: number): number;
 AVPacket_ptshi_s_sync(ptr: number, val: number): void;
-AVPacket_dts_sync(ptr: number): number;
-AVPacket_dts_s_sync(ptr: number, val: number): void;
-AVPacket_dtshi_sync(ptr: number): number;
-AVPacket_dtshi_s_sync(ptr: number, val: number): void;
-AVPacket_data_sync(ptr: number): number;
-AVPacket_data_s_sync(ptr: number, val: number): void;
-AVPacket_size_sync(ptr: number): number;
-AVPacket_size_s_sync(ptr: number, val: number): void;
-AVPacket_stream_index_sync(ptr: number): number;
-AVPacket_stream_index_s_sync(ptr: number, val: number): void;
-AVPacket_flags_sync(ptr: number): number;
-AVPacket_flags_s_sync(ptr: number, val: number): void;
 AVPacket_side_data_sync(ptr: number): number;
 AVPacket_side_data_s_sync(ptr: number, val: number): void;
 AVPacket_side_data_elems_sync(ptr: number): number;
 AVPacket_side_data_elems_s_sync(ptr: number, val: number): void;
-AVPacket_duration_sync(ptr: number): number;
-AVPacket_duration_s_sync(ptr: number, val: number): void;
-AVPacket_durationhi_sync(ptr: number): number;
-AVPacket_durationhi_s_sync(ptr: number, val: number): void;
+AVPacket_size_sync(ptr: number): number;
+AVPacket_size_s_sync(ptr: number, val: number): void;
+AVPacket_stream_index_sync(ptr: number): number;
+AVPacket_stream_index_s_sync(ptr: number, val: number): void;
+AVPacket_time_base_num_sync(ptr: number): number;
+AVPacket_time_base_num_s_sync(ptr: number, val: number): void;
+AVPacket_time_base_den_sync(ptr: number): number;
+AVPacket_time_base_den_s_sync(ptr: number, val: number): void;
+AVPacket_time_base_s_sync(ptr: number, num: number, den: number): void;
+AVFormatContext_duration_sync(ptr: number): number;
+AVFormatContext_duration_s_sync(ptr: number, val: number): void;
+AVFormatContext_durationhi_sync(ptr: number): number;
+AVFormatContext_durationhi_s_sync(ptr: number, val: number): void;
 AVFormatContext_flags_sync(ptr: number): number;
 AVFormatContext_flags_s_sync(ptr: number, val: number): void;
 AVFormatContext_nb_streams_sync(ptr: number): number;
@@ -3861,6 +4227,10 @@ AVFormatContext_oformat_sync(ptr: number): number;
 AVFormatContext_oformat_s_sync(ptr: number, val: number): void;
 AVFormatContext_pb_sync(ptr: number): number;
 AVFormatContext_pb_s_sync(ptr: number, val: number): void;
+AVFormatContext_start_time_sync(ptr: number): number;
+AVFormatContext_start_time_s_sync(ptr: number, val: number): void;
+AVFormatContext_start_timehi_sync(ptr: number): number;
+AVFormatContext_start_timehi_s_sync(ptr: number, val: number): void;
 AVFormatContext_streams_a_sync(ptr: number, idx: number): number;
 AVFormatContext_streams_a_s_sync(ptr: number, idx: number, val: number): void;
 AVStream_codecpar_sync(ptr: number): number;
@@ -3871,6 +4241,11 @@ AVStream_duration_sync(ptr: number): number;
 AVStream_duration_s_sync(ptr: number, val: number): void;
 AVStream_durationhi_sync(ptr: number): number;
 AVStream_durationhi_s_sync(ptr: number, val: number): void;
+AVStream_time_base_num_sync(ptr: number): number;
+AVStream_time_base_num_s_sync(ptr: number, val: number): void;
+AVStream_time_base_den_sync(ptr: number): number;
+AVStream_time_base_den_s_sync(ptr: number, val: number): void;
+AVStream_time_base_s_sync(ptr: number, num: number, den: number): void;
 AVFilterInOut_filter_ctx_sync(ptr: number): number;
 AVFilterInOut_filter_ctx_s_sync(ptr: number, val: number): void;
 AVFilterInOut_name_sync(ptr: number): number;
@@ -3896,7 +4271,7 @@ copyout_s32_sync(ptr: number, len: number): Int32Array;
 copyin_f32_sync(ptr: number, arr: Float32Array): void;
 copyout_f32_sync(ptr: number, len: number): Float32Array;
 
-/**
+    /**
  * Read a complete file from the in-memory filesystem.
  * @param name  Filename to read
  */
@@ -3948,6 +4323,11 @@ mkblockreaderdev_sync(name: string, size: number): void;
  */
 mkreadaheadfile_sync(name: string, file: Blob): void;
 /**
+ * Unlink a readahead file. Also gets rid of the File reference.
+ * @param name  Filename to unlink.
+ */
+unlinkreadaheadfile_sync(name: string): void;
+/**
  * Make a writer device.
  * @param name  Filename to create
  * @param mode  Unix permissions
@@ -3980,6 +4360,20 @@ mkworkerfsfile_sync(name: string, blob: Blob): string;
  */
 unlinkworkerfsfile_sync(name: string): void;
 /**
+ * Make a FileSystemFileHandle device. This writes via a FileSystemFileHandle,
+ * synchronously if possible. Note that this overrides onwrite, so if you want
+ * to support both kinds of files, make sure you set onwrite before calling
+ * this.
+ * @param name  Filename to create.
+ * @param fsfh  FileSystemFileHandle corresponding to this filename.
+ */
+mkfsfhfile(name: string, fsfh: FileSystemFileHandle): Promise<void>;
+/**
+ * Unlink a FileSystemFileHandle file. Also closes the file handle.
+ * @param name  Filename to unlink.
+ */
+unlinkfsfhfile(name: string): Promise<void>;
+/**
  * Send some data to a reader device. To indicate EOF, send null. To indicate an
  * error, send EOF and include an error code in the options.
  * @param name  Filename of the reader device.
@@ -4011,6 +4405,8 @@ ff_block_reader_dev_send_sync(
     }
 ): void;
 /**
+ * @deprecated
+ * DEPRECATED. Use the onread callback.
  * Metafunction to determine whether any device has any waiters. This can be
  * used to determine whether more data needs to be sent before a previous step
  * will be fully resolved.
@@ -4035,10 +4431,14 @@ ff_init_encoder_sync(
  * Similar to ff_init_encoder but doesn't need to initialize the frame.
  * Returns [AVCodec, AVCodecContext, AVPacket, AVFrame]
  * @param name  libav decoder identifier or name
- * @param codecpar  Optional AVCodecParameters
+ * @param config  Decoder configuration. Can just be a number for codec
+ *                parameters, or can be multiple configuration options.
  */
 ff_init_decoder_sync(
-    name: string | number, codecpar?: number
+    name: string | number, config?: number | {
+        codecpar?: number | CodecParameters,
+        time_base?: [number, number]
+    }
 ): [number, number, number, number];
 /**
  * Free everything allocated by ff_init_encoder.
@@ -4065,12 +4465,22 @@ ff_free_decoder_sync(
  * @param frame  AVFrame
  * @param pkt  AVPacket
  * @param inFrames  Array of frames in libav.js format
- * @param fin  Set to true if this is the end of encoding
+ * @param config  Encoding options. May be "true" to indicate end of stream.
  */
 ff_encode_multi_sync(
     ctx: number, frame: number, pkt: number, inFrames: (Frame | number)[],
-    fin?: boolean
-): Packet[];
+    config?: boolean | {
+        fin?: boolean,
+        copyoutPacket?: "default"
+    }
+): Packet[]
+ff_encode_multi_sync(
+    ctx: number, frame: number, pkt: number, inFrames: (Frame | number)[],
+    config: {
+        fin?: boolean,
+        copyoutPacket: "ptr"
+    }
+): number[];
 /**
  * Decode some number of packets at once. Done in one go to avoid excess
  * message passing.
@@ -4090,7 +4500,7 @@ ff_decode_multi_sync(
 ): Frame[]
 ff_decode_multi_sync(
     ctx: number, pkt: number, frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ptr"
@@ -4098,7 +4508,7 @@ ff_decode_multi_sync(
 ): number[]
 ff_decode_multi_sync(
     ctx: number, pkt: number, frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ImageData"
@@ -4167,7 +4577,7 @@ ff_read_frame_multi_sync(
     }
 ): [number, Record<number, Packet[]>] | Promise<[number, Record<number, Packet[]>]>
 ff_read_frame_multi_sync(
-    fmt_ctx: number, pkt: number, opts?: {
+    fmt_ctx: number, pkt: number, opts: {
         limit?: number, // OUTPUT limit, in bytes
         unify?: boolean, // If true, unify the packets into a single stream (called 0), so that the output is in the same order as the input
         copyoutPacket: "ptr" // Version of ff_copyout_packet to use
@@ -4186,14 +4596,14 @@ ff_read_frame_multi_sync(
  * @param opts  Other options
  */
 ff_read_multi_sync(
-    fmt_ctx: number, pkt: number, devfile?: string, opts?: {
+    fmt_ctx: number, pkt: number, devfile?: string | null, opts?: {
         limit?: number, // OUTPUT limit, in bytes
         unify?: boolean, // If true, unify the packets into a single stream (called 0), so that the output is in the same order as the input
         copyoutPacket?: "default" // Version of ff_copyout_packet to use
     }
 ): [number, Record<number, Packet[]>] | Promise<[number, Record<number, Packet[]>]>
 ff_read_multi_sync(
-    fmt_ctx: number, pkt: number, devfile?: string, opts?: {
+    fmt_ctx: number, pkt: number, devfile: string | null, opts: {
         limit?: number, // OUTPUT limit, in bytes
         devLimit?: number, // INPUT limit, in bytes (don't read if less than this much data is available)
         unify?: boolean, // If true, unify the packets into a single stream (called 0), so that the output is in the same order as the input
@@ -4234,6 +4644,10 @@ ff_init_filter_graph_sync(
 ): [number, number[], number[]];
 /**
  * Filter some number of frames, possibly corresponding to multiple sources.
+ * Only one sink is allowed, but config is per source. Set
+ * `config.ignoreSinkTimebase` to leave frames' timebase as it was, rather than
+ * imposing the timebase of the buffer sink. Set `config.copyoutFrame` to use a
+ * different copier than the default.
  * @param srcs  AVFilterContext(s), input
  * @param buffersink_ctx  AVFilterContext, output
  * @param framePtr  AVFrame
@@ -4245,6 +4659,7 @@ ff_filter_multi_sync(
     srcs: number, buffersink_ctx: number, framePtr: number,
     inFrames: (Frame | number)[], config?: boolean | {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame?: "default" | "video" | "video_packed"
     }
 ): Frame[];
@@ -4252,34 +4667,39 @@ ff_filter_multi_sync(
     srcs: number[], buffersink_ctx: number, framePtr: number,
     inFrames: (Frame | number)[][], config?: boolean[] | {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame?: "default" | "video" | "video_packed"
     }[]
 ): Frame[]
 ff_filter_multi_sync(
     srcs: number, buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[], config?: boolean | {
+    inFrames: (Frame | number)[], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ptr"
     }
 ): number[];
 ff_filter_multi_sync(
     srcs: number[], buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[][], config?: boolean[] | {
+    inFrames: (Frame | number)[][], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ptr"
     }[]
 ): number[]
 ff_filter_multi_sync(
     srcs: number, buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[], config?: boolean | {
+    inFrames: (Frame | number)[], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ImageData"
     }
 ): ImageData[];
 ff_filter_multi_sync(
     srcs: number[], buffersink_ctx: number, framePtr: number,
-    inFrames: (Frame | number)[][], config?: boolean[] | {
+    inFrames: (Frame | number)[][], config: {
         fin?: boolean,
+        ignoreSinkTimebase?: boolean,
         copyoutFrame: "ImageData"
     }[]
 ): ImageData[];
@@ -4307,7 +4727,7 @@ ff_decode_filter_multi_sync(
 ff_decode_filter_multi_sync(
     ctx: number, buffersrc_ctx: number, buffersink_ctx: number, pkt: number,
     frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ptr"
@@ -4316,7 +4736,7 @@ ff_decode_filter_multi_sync(
 ff_decode_filter_multi_sync(
     ctx: number, buffersrc_ctx: number, buffersink_ctx: number, pkt: number,
     frame: number, inPackets: (Packet | number)[],
-    config?: boolean | {
+    config: {
         fin?: boolean,
         ignoreErrors?: boolean,
         copyoutFrame: "ImageData"
@@ -4375,6 +4795,17 @@ ff_copyout_packet_ptr_sync(pkt: number): number;
  */
 ff_copyin_packet_sync(pktPtr: number, packet: Packet | number): void;
 /**
+ * Copy out codec parameters.
+ * @param codecpar  AVCodecParameters
+ */
+ff_copyout_codecpar_sync(codecpar: number): CodecParameters;
+/**
+ * Copy in codec parameters.
+ * @param codecparPtr  AVCodecParameters
+ * @param codecpar  Codec parameters to copy in.
+ */
+ff_copyin_codecpar_sync(codecparPtr: number, codecpar: CodecParameters): void;
+/**
  * Allocate and copy in a 32-bit int list.
  * @param list  List of numbers to copy in
  */
@@ -4413,80 +4844,81 @@ ffmpeg_sync(...args: (string | string[])[]): number | Promise<number>;
  */
 ffprobe_sync(...args: (string | string[])[]): number | Promise<number>;
 
+    }
+
+    /**
+     * Options to create a libav.js instance.
+     */
+    export interface LibAVOpts {
+        /**
+         * Don't create a worker.
+         */
+        noworker?: boolean;
+
+        /**
+         * Don't use WebAssembly.
+         */
+        nowasm?: boolean;
+
+        /**
+         * Use threads. If threads ever become reliable, this flag will disappear,
+         * and you will need to use nothreads.
+         */
+        yesthreads?: boolean;
+
+        /**
+         * Don't use threads. The default.
+         */
+        nothreads?: boolean;
+
+        /**
+         * Don't use ES6 modules for loading, even if libav.js was compiled as an
+         * ES6 module.
+         */
+        noes6?: boolean;
+
+        /**
+         * URL base from which to load workers and modules.
+         */
+        base?: string;
+
+        /**
+         * URL from which to load the module factory.
+         */
+        toImport?: string;
+
+        /**
+         * The module factory to use itself.
+         */
+        factory?: any;
+
+        /**
+         * The variant to load (instead of whichever variant was compiled)
+         */
+        variant?: string;
+
+        /**
+         * The full URL from which to load the .wasm file.
+         */
+        wasmurl?: string;
+    }
+
+    /**
+     * The main wrapper for libav.js, typically named "LibAV".
+     */
+    export interface LibAVWrapper extends LibAVOpts, LibAVStatic {
+        /**
+         * Create a LibAV instance.
+         * @param opts  Options
+         */
+        LibAV(opts?: LibAVOpts & {noworker?: false}): Promise<LibAV>;
+        LibAV(opts: LibAVOpts & {noworker: true}): Promise<LibAV & LibAVSync>;
+        LibAV(opts: LibAVOpts): Promise<LibAV | LibAV & LibAVSync>;
+    }
 }
 
 /**
- * Options to create a libav.js instance.
+ * The actual export is the namespace (for types) and a wrapper (for data).
  */
-export interface LibAVOpts {
-    /**
-     * Don't create a worker.
-     */
-    noworker?: boolean;
-
-    /**
-     * Don't use WebAssembly.
-     */
-    nowasm?: boolean;
-
-    /**
-     * Use threads. If threads ever become reliable, this flag will disappear,
-     * and you will need to use nothreads.
-     */
-    yesthreads?: boolean;
-
-    /**
-     * Don't use threads. The default.
-     */
-    nothreads?: boolean;
-
-    /**
-     * Don't use ES6 modules for loading, even if libav.js was compiled as an
-     * ES6 module.
-     */
-    noes6?: boolean;
-
-    /**
-     * URL base from which to load workers and modules.
-     */
-    base?: string;
-
-    /**
-     * URL from which to load the module factory.
-     */
-    toImport?: string;
-
-    /**
-     * The module factory to use itself.
-     */
-    factory?: any;
-
-    /**
-     * The variant to load (instead of whichever variant was compiled)
-     */
-    variant?: string;
-
-    /**
-     * The full URL from which to load the .wasm file.
-     */
-    wasmurl?: string;
-}
-
-/**
- * The main wrapper for libav.js, typically named "LibAV".
- */
-export interface LibAVWrapper extends LibAVOpts, LibAVStatic {
-    /**
-     * Create a LibAV instance.
-     * @param opts  Options
-     */
-    LibAV(opts?: LibAVOpts & {noworker?: false}): Promise<LibAV>;
-    LibAV(opts: LibAVOpts & {noworker: true}): Promise<LibAV & LibAVSync>;
-    LibAV(opts: LibAVOpts): Promise<LibAV | LibAV & LibAVSync>;
-}
-
-/**
- * If using ES6, the main export.
- */
-declare const LibAV: LibAVWrapper;
-export default LibAV;
+declare const LibAV: LibAV.LibAVWrapper;
+export = LibAV;
